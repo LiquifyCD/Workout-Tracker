@@ -36,7 +36,7 @@
     table{width:100%;border-collapse:collapse}th{font-size:11px;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.1em;padding:10px 14px;border-bottom:1px solid var(--border)}td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}tr:last-child td{border-bottom:0}.exname{font-weight:800}.meta{color:var(--muted);font-size:12px;margin-top:2px}.mono{font-variant-numeric:tabular-nums;color:var(--soft)}.badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border2);border-radius:999px;padding:4px 9px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.06em}.badge.increase{color:#0b0a10;background:var(--accent2);border-color:transparent}.badge.repeat{color:var(--blue);background:rgba(179,199,255,.1);border-color:rgba(179,199,255,.24)}.badge.reduce{color:var(--warn);background:rgba(214,188,250,.1);border-color:rgba(214,188,250,.24)}.badge.rest{color:var(--bad);background:rgba(255,107,138,.1);border-color:rgba(255,107,138,.26)}
     .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.formgrid.four{grid-template-columns:repeat(4,1fr)}.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:850}input,select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:13px;color:var(--text);padding:12px 13px;min-height:44px}input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}select option{background:var(--bg2)}.decision{display:none;margin-top:12px;border:1px solid var(--border2);background:var(--bg3);border-radius:16px;padding:13px}.decision.show{display:block}.decision h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px}.decision p{color:var(--muted);font-size:13px;margin-top:7px}.stack{display:flex;flex-direction:column;gap:10px}.history-card{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px}.history-card .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.history-card h3{font-size:14px}.history-card .line{color:var(--muted);font-size:12px;margin-top:4px}.filters{display:flex;gap:8px;overflow:auto;padding-bottom:4px}.filters button{white-space:nowrap;border:1px solid var(--border);background:var(--bg3);color:var(--muted);border-radius:999px;padding:8px 11px;font-size:12px;font-weight:800}.filters button.active{color:var(--text);border-color:var(--accent);background:rgba(159,122,234,.12)}
     .schedule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.day-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;overflow:hidden}.day-head{padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}.circle{height:31px;width:31px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(159,122,234,.35);color:var(--accent3);background:rgba(159,122,234,.12);font-weight:900}.day-head h3{font-size:14px}.day-head p{font-size:12px;color:var(--muted)}.exrow{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px}.exrow:last-child{border-bottom:0}.exrow span:last-child{color:var(--muted);white-space:nowrap}
-    .auth{position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% -10%, rgba(159,122,234,.25), transparent 35%),var(--bg);display:none;align-items:center;justify-content:center;padding:24px}.auth.show{display:flex}.auth-card{width:min(430px,100%);background:rgba(12,12,16,.93);border:1px solid var(--border2);border-radius:26px;padding:24px;box-shadow:var(--shadow)}.auth-card h1{font-size:26px;text-transform:uppercase;letter-spacing:.16em}.auth-card p{color:var(--muted);margin:10px 0 18px}.small{font-size:12px;color:var(--muted)}.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,80px);opacity:0;transition:.24s;z-index:2000;background:var(--bg2);border:1px solid var(--border2);border-radius:999px;padding:12px 16px;color:var(--text);box-shadow:var(--shadow);font-weight:800}.toast.show{transform:translate(-50%,0);opacity:1}.bottomnav{display:none;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:80;background:rgba(12,12,16,.9);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:22px;padding:7px;box-shadow:var(--shadow)}.bottomnav button{flex:1;background:transparent;border:0;color:var(--muted);border-radius:16px;padding:9px 4px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.04em}.bottomnav button.active{background:rgba(159,122,234,.16);color:var(--text)}
+    .auth{position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% -10%, rgba(159,122,234,.25), transparent 35%),var(--bg);display:none;align-items:center;justify-content:center;padding:24px}.auth.show{display:flex}.auth-card{width:min(430px,100%);background:rgba(12,12,16,.93);border:1px solid var(--border2);border-radius:26px;padding:24px;box-shadow:var(--shadow)}.auth-card h1{font-size:26px;text-transform:uppercase;letter-spacing:.16em}.auth-card p{color:var(--muted);margin:10px 0 18px}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:5px;margin:14px 0}.auth-tab{border:0;background:transparent;color:var(--muted);border-radius:12px;padding:10px;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.auth-tab.active{background:rgba(159,122,234,.18);color:var(--text)}.auth-mode{display:none}.auth-mode.active{display:block}.small{font-size:12px;color:var(--muted)}.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,80px);opacity:0;transition:.24s;z-index:2000;background:var(--bg2);border:1px solid var(--border2);border-radius:999px;padding:12px 16px;color:var(--text);box-shadow:var(--shadow);font-weight:800}.toast.show{transform:translate(-50%,0);opacity:1}.bottomnav{display:none;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:80;background:rgba(12,12,16,.9);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:22px;padding:7px;box-shadow:var(--shadow)}.bottomnav button{flex:1;background:transparent;border:0;color:var(--muted);border-radius:16px;padding:9px 4px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.04em}.bottomnav button.active{background:rgba(159,122,234,.16);color:var(--text)}
     .hide{display:none!important}.empty{padding:42px 20px;text-align:center;color:var(--muted)}.empty h3{font-size:20px;color:var(--faint);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}.warnbox{border:1px solid rgba(214,188,250,.28);background:rgba(214,188,250,.07);border-radius:16px;padding:13px;color:var(--soft);font-size:13px}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent3)}
     @media(max-width:820px){.app{padding:12px 12px 96px}.topbar{padding:10px 12px}.nav{display:none}.bottomnav{display:flex}.brand h1{font-size:14px}.brand p{display:none}.sync{margin-left:auto}.grid3{grid-template-columns:1fr 1fr}.grid3 .stat:nth-child(2){grid-column:1/-1;order:-1}.stat{min-height:auto;padding:14px}.stat .value{font-size:28px}.workout-head{align-items:flex-start;flex-direction:column}.formgrid,.formgrid.four{grid-template-columns:1fr 1fr}.schedule-grid{grid-template-columns:1fr}.tablewrap{overflow:auto}.desktop-table.history{display:none}.history-card{display:block}.card.pad{padding:14px}th,td{padding:10px}.section{margin-top:18px}}
     @media(max-width:430px){.formgrid,.formgrid.four{grid-template-columns:1fr}.btnrow .btn{flex:1}.grid3{grid-template-columns:1fr}.toast{width:calc(100% - 28px);text-align:center}.workout-title{font-size:18px}}
@@ -47,11 +47,27 @@
     <div class="auth-card">
       <div class="sigil" style="margin-bottom:16px"></div>
       <h1>Amethyst Loop</h1>
-      <p>Minimal cloud login. Enter your email, click the magic link, and your training log syncs between PC and iPhone.</p>
-      <div class="field"><label>Email</label><input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></div>
-      <div class="btnrow" style="margin-top:12px"><button class="btn primary" onclick="signIn()">Send magic link</button></div>
+      <p>Cloud login with email + password. Your log syncs between PC and iPhone after you sign in.</p>
+
+      <div class="auth-tabs">
+        <button id="auth-tab-login" class="auth-tab active" onclick="setAuthMode('login')">Login</button>
+        <button id="auth-tab-create" class="auth-tab" onclick="setAuthMode('create')">Create</button>
+      </div>
+
+      <div id="auth-login" class="auth-mode active">
+        <div class="field"><label>Email</label><input id="login-email" type="email" autocomplete="email" placeholder="you@example.com"></div>
+        <div class="field" style="margin-top:10px"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Your password" onkeydown="if(event.key==='Enter')signInPassword()"></div>
+        <div class="btnrow" style="margin-top:12px"><button class="btn primary" onclick="signInPassword()">Login</button><button class="btn ghost" onclick="resetPassword()">Reset password</button></div>
+      </div>
+
+      <div id="auth-create" class="auth-mode">
+        <div class="field"><label>Email</label><input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com"></div>
+        <div class="field" style="margin-top:10px"><label>Password</label><input id="signup-password" type="password" autocomplete="new-password" placeholder="Minimum 6 characters" onkeydown="if(event.key==='Enter')signUpPassword()"></div>
+        <div class="btnrow" style="margin-top:12px"><button class="btn primary" onclick="signUpPassword()">Create account</button></div>
+      </div>
+
       <p id="auth-msg" class="small"></p>
-      <div class="warnbox" style="margin-top:14px">This page uses Supabase Auth + Row Level Security. No hidden password is stored in GitHub.</div>
+      <div class="warnbox" style="margin-top:14px">Use Supabase Email auth with <b>Confirm email disabled</b> for no confirmation step. Security still comes from Supabase Auth + Row Level Security.</div>
     </div>
   </div>
 
@@ -176,12 +192,55 @@ function scheduleByDay(day){return SCHEDULE.find(x=>x.day===day)||SCHEDULE[0]}
 function setActiveButtons(page){document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page))}
 function showPage(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));qs('page-'+page).classList.add('active');setActiveButtons(page);renderAll()}
 
-async function signIn(){
-  const email = qs('auth-email').value.trim();
-  if(!email){qs('auth-msg').textContent='Enter your email first.'; return;}
-  qs('auth-msg').textContent='Sending...';
-  const {error}=await supabaseClient.auth.signInWithOtp({email, options:{emailRedirectTo: window.location.origin + window.location.pathname}});
-  qs('auth-msg').textContent = error ? error.message : 'Check your email for the login link.';
+function setAuthMode(mode){
+  qs('auth-login').classList.toggle('active', mode === 'login');
+  qs('auth-create').classList.toggle('active', mode === 'create');
+  qs('auth-tab-login').classList.toggle('active', mode === 'login');
+  qs('auth-tab-create').classList.toggle('active', mode === 'create');
+  qs('auth-msg').textContent = '';
+}
+function readAuthFields(prefix){
+  return {
+    email: qs(prefix + '-email').value.trim(),
+    password: qs(prefix + '-password').value
+  };
+}
+async function signInPassword(){
+  const { email, password } = readAuthFields('login');
+  if(!email || !password){qs('auth-msg').textContent='Enter email and password.'; return;}
+  qs('auth-msg').textContent='Logging in...';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){qs('auth-msg').textContent=error.message; return;}
+  qs('auth-msg').textContent='Logged in.';
+  await checkAuth();
+}
+async function signUpPassword(){
+  const { email, password } = readAuthFields('signup');
+  if(!email || !password){qs('auth-msg').textContent='Enter email and password.'; return;}
+  if(password.length < 6){qs('auth-msg').textContent='Password must be at least 6 characters.'; return;}
+  qs('auth-msg').textContent='Creating account...';
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+  if(error){qs('auth-msg').textContent=error.message; return;}
+  qs('auth-msg').textContent='Account created. Logging you in...';
+  const login = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(login.error){
+    qs('auth-msg').textContent='Account created. Now use the Login tab.';
+    setAuthMode('login');
+    qs('login-email').value = email;
+    return;
+  }
+  await checkAuth();
+}
+async function resetPassword(){
+  const email = qs('login-email').value.trim();
+  if(!email){qs('auth-msg').textContent='Enter your email first, then press reset.'; return;}
+  qs('auth-msg').textContent='Sending password reset email...';
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  qs('auth-msg').textContent = error ? error.message : 'Password reset email sent.';
 }
 async function signOut(){await supabaseClient.auth.signOut(); location.reload();}
 async function getUser(){const {data}=await supabaseClient.auth.getUser(); return data.user;}
