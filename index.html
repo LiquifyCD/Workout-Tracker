@@ -31,7 +31,7 @@
     .brand{display:flex;align-items:center;gap:10px;min-width:0}.sigil{width:34px;height:34px;border-radius:13px;background:linear-gradient(145deg,#fff,#9f7aea 42%,#20172d);box-shadow:0 0 26px var(--glow);position:relative;flex-shrink:0}.sigil:after{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.45);border-radius:8px;transform:rotate(45deg)}
     .brand h1{font-size:16px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}.brand p{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap}
     .nav{margin-left:auto;display:flex;gap:6px}.nav button{border:1px solid transparent;background:transparent;color:var(--muted);padding:8px 10px;border-radius:12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.nav button.active{color:var(--text);background:rgba(255,255,255,.055);border-color:var(--border2)}
-    .sync{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;margin-left:4px}.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}.dot.ok{background:var(--accent2);box-shadow:0 0 14px var(--glow)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+    .sync{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;margin-left:4px}.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}.dot.ok{background:var(--accent2);box-shadow:0 0 14px var(--glow)}.dot.bad{background:var(--bad)}.account-actions{display:flex;align-items:center;gap:6px;margin-left:6px}.mini-btn{border:1px solid var(--border2);background:rgba(255,255,255,.035);color:var(--soft);border-radius:999px;padding:7px 10px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}.mini-btn:hover{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}.mini-btn.danger{color:var(--bad);border-color:rgba(255,107,138,.3);background:rgba(255,107,138,.06)}.dot.warn{background:var(--warn)}
     .page{display:none;animation:fade .18s ease}.page.active{display:block}@keyframes fade{from{opacity:.35;transform:translateY(4px)}to{opacity:1;transform:none}}
     .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0}.stat{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018));border:1px solid var(--border);border-radius:var(--radius);padding:17px;min-height:112px;box-shadow:var(--shadow)}.stat .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:850}.stat .value{font-size:34px;line-height:1.1;margin:12px 0 2px;font-weight:900}.stat .sub{font-size:12px;color:var(--muted)}
     .section{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px}.section h2{font-size:21px;letter-spacing:.02em}.tag{border:1px solid var(--border2);background:rgba(255,255,255,.04);color:var(--soft);border-radius:999px;padding:5px 10px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.08em}.tag.purple{color:var(--accent3);background:rgba(159,122,234,.12);border-color:rgba(159,122,234,.3)}.tag.white{color:#fff;background:rgba(255,255,255,.07)}
@@ -51,12 +51,10 @@
     <div class="auth-card">
       <div class="sigil" style="margin-bottom:16px"></div>
       <h1>Divinity</h1>
-      <p>One shared cloud login. After login, pick Alfred, Maja, Elias, or Jacqueline.</p>
       <div class="field"><label>Email</label><input id="login-email" type="email" autocomplete="email" placeholder="shared@email.com"></div>
       <div class="field" style="margin-top:10px"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Shared site password" onkeydown="if(event.key==='Enter')signInPassword()"></div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" onclick="signInPassword()">Login</button><button class="btn ghost" onclick="resetPassword()">Reset</button></div>
       <p id="auth-msg" class="small"></p>
-      <div class="warnbox" style="margin-top:14px">Account creation is removed from the site. Create or change the shared account in Supabase only.</div>
     </div>
   </div>
 
@@ -64,9 +62,8 @@
     <div class="profile-card">
       <div class="sigil" style="margin-bottom:16px"></div>
       <h1>Choose profile</h1>
-      <p>Each profile has separate logs, schedule, attendance, and leaderboard stats.</p>
       <div id="profile-grid" class="profile-grid"></div>
-      <div class="btnrow" style="margin-top:14px"><button class="btn ghost" onclick="signOut()">Sign out</button></div>
+      <div class="btnrow" style="margin-top:14px"><button class="btn ghost" onclick="hideProfilePicker()">Keep current</button><button class="btn ghost" onclick="switchAccount()">Switch account</button><button class="btn bad" onclick="signOut()">Logout</button></div>
     </div>
   </div>
 
@@ -81,6 +78,11 @@
       <button data-page="settings" onclick="showPage('settings')">Settings</button>
     </nav>
     <div class="sync"><span id="sync-dot" class="dot"></span><span id="sync-text">Loading</span></div>
+    <div class="account-actions">
+      <button class="mini-btn" id="active-profile-btn" onclick="showProfilePicker()">Profile</button>
+      <button class="mini-btn" onclick="switchAccount()">Switch account</button>
+      <button class="mini-btn danger" onclick="signOut()">Logout</button>
+    </div>
   </header>
 
   <main class="app">
@@ -150,7 +152,7 @@
     </section>
 
     <section id="page-settings" class="page">
-      <div class="section"><h2>Settings</h2><button class="btn ghost" onclick="signOut()">Sign out</button></div>
+      <div class="section"><h2>Settings</h2><div class="btnrow"><button class="btn" onclick="showProfilePicker()">Switch profile</button><button class="btn ghost" onclick="switchAccount()">Switch account</button><button class="btn bad" onclick="signOut()">Logout</button></div></div>
       <div class="grid3">
         <div class="stat"><div class="label">Selected profile</div><div class="value" id="settings-profile">Alfred</div><div class="sub"><button class="btn small ghost" onclick="showProfilePicker()">Switch profile</button></div></div>
         <div class="stat"><div class="label">Estimated DB use</div><div class="value" id="usage-mb">0 MB</div><div class="sub" id="usage-sub">safe</div></div>
@@ -223,6 +225,12 @@ async function resetPassword(){
   qs("auth-msg").textContent=error?error.message:"Password reset email sent.";
 }
 async function signOut(){await supabaseClient.auth.signOut();localStorage.removeItem("divinity-profile");location.reload()}
+async function switchAccount(){
+  await supabaseClient.auth.signOut();
+  localStorage.removeItem("divinity-profile");
+  sessionStorage.clear();
+  location.reload();
+}
 async function getUser(){const {data}=await supabaseClient.auth.getUser();return data.user}
 async function checkAuth(){
   setSync("", "Checking");
@@ -362,6 +370,7 @@ function renderDashboard(){
   const n=activeSchedule()[nextDayIndex()];
   const att=attendanceFor(currentProfileKey,7);
   qs("brand-sub").textContent=`${activeProfile().name} · group tracker`;
+  if(qs("active-profile-btn")) qs("active-profile-btn").textContent=activeProfile().name;
   qs("stat-workouts").textContent=completedEntries().length;
   qs("stat-next").textContent=n.day;
   qs("stat-next-title").textContent=n.title;
