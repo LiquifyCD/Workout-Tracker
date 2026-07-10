@@ -261,7 +261,7 @@ function profileEntries(key=currentProfileKey){return entries.filter(e=>e.profil
 function completedEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex===COMPLETE_EX&&!e.isRest)}
 function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest)}
 function scheduleByDay(day,key=currentProfileKey){return activeSchedule(key).find(x=>x.day===day)||activeSchedule(key)[0]}
-function nextDayIndex(key=currentProfileKey){const c=completedEntries(key)[0]; if(!c) return 0; const idx=parseInt(String(c.day).replace("Day ",""))-1; return (idx+1)%activeSchedule(key).length}
+function nextDayIndex(key=currentProfileKey){const schedule=activeSchedule(key);const c=completedEntries(key)[0];if(!c)return 0;const idx=schedule.findIndex(d=>d.day===c.day);return idx<0?0:(idx+1)%schedule.length}
 function latestSetFor(ex,key=currentProfileKey){return setEntries(key).find(e=>e.ex===ex)}
 function decisionClass(d){return d==="increase"?"increase":d==="reduce"?"reduce":d==="rest"?"rest":d==="complete"?"complete":"repeat"}
 
@@ -273,7 +273,7 @@ function decide(s1,s2,rir,range){
   if(sets.every(r=>r>=max) && rir>1) return {decision:"repeat",label:"Repeat, push harder",reason:"Top reps reached but RIR suggests more available.",cls:"repeat"};
   return {decision:"repeat",label:"Repeat load",reason:"Within range, not fully maxed yet.",cls:"repeat"};
 }
-function defaultRangeFor(ex){
+function guessedRangeFor(ex){
   if(/lateral/i.test(ex)) return "8-15";
   if(/calf/i.test(ex)) return "6-12";
   if(/curl|extension|pec deck/i.test(ex) && !/stiff/i.test(ex)) return "6-10";
@@ -292,7 +292,7 @@ function fillDaySelect(){
   qs("log-day").value=sched[nextDayIndex(currentProfileKey)].day;
   fillExercisesForDay();
 }
-function dayEntries(day,key=currentProfileKey){return setEntries(key).filter(e=>e.day===day)}
+function dayEntries(day,key=currentProfileKey){const completion=completedEntries(key).find(e=>e.day===day);return setEntries(key).filter(e=>e.day===day&&(!completion||e.created>completion.created))}
 function lastLoggedExerciseForDay(day,key=currentProfileKey){const dayLog=dayEntries(day,key);return dayLog.length?dayLog[0].ex:null}
 function nextExerciseForDay(day,key=currentProfileKey){const d=scheduleByDay(day,key);const last=lastLoggedExerciseForDay(day,key);if(!last) return d.exs[0][0];const idx=d.exs.findIndex(e=>e[0]===last);return d.exs[(idx+1+d.exs.length)%d.exs.length][0]}
 function renderLogPreview(){const ex=qs("log-ex")?.value; if(!ex) return; const last=latestSetFor(ex); if(!last){qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${ex}</strong>. No recent set yet.</div>`; return;} qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${ex}</strong>. Last saved ${last.load??"—"} kg, ${last.s1}${last.s2?"/"+last.s2:""} reps, ${last.decision}.</div>`}
@@ -300,11 +300,20 @@ function fillExercisesForDay(){
   const d=scheduleByDay(qs("log-day").value,currentProfileKey);
   qs("log-ex").innerHTML=d.exs.map(e=>`<option value="${e[0]}">${e[0]}</option>`).join("");
   qs("log-ex").value=nextExerciseForDay(qs("log-day").value,currentProfileKey);
-  setDefaultRange();
+  setExerciseDefaults();
+}
+function setExerciseDefaults(){
+  const range=rangeForExercise();
+  if(![...qs("log-range").options].some(option=>option.value===range))qs("log-range").add(new Option(range,range));
+  qs("log-range").value=range;
+  const last=latestSetFor(qs("log-ex").value),midpoint=rangeMidpoint(range);
+  qs("log-load").value=last?.load??"";
+  qs("log-s1").value=last?.s1||midpoint;
+  qs("log-s2").value=last?.s2||midpoint;
   renderLogPreview();
 }
-function setDefaultRange(){qs("log-range").value=defaultRangeFor(qs("log-ex").value)}
-function clearForm(){["log-load","log-s1","log-s2","log-rir","log-notes"].forEach(id=>qs(id).value="");qs("decision").classList.remove("show");renderLogPreview()}
+function setDefaultRange(){setExerciseDefaults()}
+function clearForm(){["log-rir","log-notes"].forEach(id=>qs(id).value="");qs("decision").classList.remove("show");setExerciseDefaults()}
 
 async function insertRow(row){
   user = user || await getUser();
@@ -324,10 +333,8 @@ async function addEntry(){
     qs("decision-main").innerHTML=`<span class="badge ${dec.cls}">${dec.label}</span>`;
     qs("decision-reason").textContent=dec.reason;
     toast("Set saved");
-    clearForm();
     qs("log-ex").value=nextExerciseForDay(day,currentProfileKey);
-    setDefaultRange();
-    renderLogPreview();
+    clearForm();
   }
 }
 async function markWorkoutComplete(){
@@ -436,6 +443,10 @@ function renderAll(){
   if(!user) return;
   renderProfilePicker(); fillProfileSelects(); fillDaySelect(); renderDashboard(); renderLoads(); renderHistory(); renderSchedule(); renderSettings(); if(qs("schedule-editor").innerHTML==="") loadEditorForProfile(editorProfileKey);
 }
+function normalizeRange(range){const match=String(range||"").match(/(\d+)\D+(\d+)/);return match?`${match[1]}-${match[2]}`:""}
+function selectedExercise(day=qs("log-day").value,key=currentProfileKey){return scheduleByDay(day,key).exs.find(e=>e[0]===qs("log-ex").value)}
+function rangeForExercise(day=qs("log-day").value,key=currentProfileKey){const exercise=selectedExercise(day,key);return normalizeRange(exercise?.[2])||guessedRangeFor(qs("log-ex").value)}
+function rangeMidpoint(range){const [min,max]=normalizeRange(range).split("-").map(Number);return Math.round((min+max)/2)}
 
 supabaseClient.auth.onAuthStateChange((event, session)=>{ if(event==="SIGNED_IN") checkAuth(); });
 checkAuth();
