@@ -13,38 +13,7 @@
   <link rel="manifest" href="./site.webmanifest">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root{
-      --bg:#050507;--bg2:#0c0c10;--bg3:#15151c;--bg4:#1d1b25;
-      --text:#f7f4ff;--soft:#d9d2e8;--muted:#8d849c;--faint:#5c5369;
-      --border:#24202f;--border2:#332b42;
-      --accent:#9f7aea;--accent2:#b794f4;--accent3:#d6bcfa;--glow:rgba(159,122,234,.18);
-      --white:#ffffff;--ok:#b794f4;--warn:#d6bcfa;--bad:#ff6b8a;--blue:#b3c7ff;--green:#86efac;
-      --radius:18px;--shadow:0 20px 60px rgba(0,0,0,.35);
-    }
-    *{box-sizing:border-box;margin:0;padding:0}
-    html{background:var(--bg);scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-    body{min-height:100dvh;background:radial-gradient(circle at 20% -10%, rgba(159,122,234,.17), transparent 34%),radial-gradient(circle at 92% 9%, rgba(255,255,255,.06), transparent 25%),var(--bg);color:var(--text);font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;font-size:14px;line-height:1.45;}
-    button,input,select,textarea{font:inherit;touch-action:manipulation} button{cursor:pointer}
-    .app{max-width:1180px;margin:0 auto;padding:18px 18px calc(150px + env(safe-area-inset-bottom))}
-    .topbar{position:sticky;top:0;z-index:50;background:rgba(5,5,7,.80);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);padding:12px 18px;display:flex;align-items:center;gap:12px}
-    .brand{display:flex;align-items:center;gap:10px;min-width:0}.sigil{width:34px;height:34px;border-radius:13px;background:linear-gradient(145deg,#fff,#9f7aea 42%,#20172d);box-shadow:0 0 26px var(--glow);position:relative;flex-shrink:0}.sigil:after{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.45);border-radius:8px;transform:rotate(45deg)}
-    .brand h1{font-size:16px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}.brand p{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap}
-    .nav{margin-left:auto;display:flex;gap:6px}.nav button{border:1px solid transparent;background:transparent;color:var(--muted);padding:8px 10px;border-radius:12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.nav button.active{color:var(--text);background:rgba(255,255,255,.055);border-color:var(--border2)}
-    .sync{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;margin-left:4px}.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}.dot.ok{background:var(--accent2);box-shadow:0 0 14px var(--glow)}.dot.bad{background:var(--bad)}.account-actions{display:flex;align-items:center;gap:6px;margin-left:6px}.mini-btn{border:1px solid var(--border2);background:rgba(255,255,255,.035);color:var(--soft);border-radius:999px;padding:7px 10px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}.mini-btn:hover{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}.mini-btn.danger{color:var(--bad);border-color:rgba(255,107,138,.3);background:rgba(255,107,138,.06)}.dot.warn{background:var(--warn)}
-    .page{display:none;animation:fade .18s ease}.page.active{display:block}@keyframes fade{from{opacity:.35;transform:translateY(4px)}to{opacity:1;transform:none}}
-    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0}.stat{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018));border:1px solid var(--border);border-radius:var(--radius);padding:17px;min-height:112px;box-shadow:var(--shadow)}.stat .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:850}.stat .value{font-size:34px;line-height:1.1;margin:12px 0 2px;font-weight:900}.stat .sub{font-size:12px;color:var(--muted)}
-    .section{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px}.section h2{font-size:21px;letter-spacing:.02em}.tag{border:1px solid var(--border2);background:rgba(255,255,255,.04);color:var(--soft);border-radius:999px;padding:5px 10px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.08em}.tag.purple{color:var(--accent3);background:rgba(159,122,234,.12);border-color:rgba(159,122,234,.3)}.tag.white{color:#fff;background:rgba(255,255,255,.07)}
-    .card{background:rgba(12,12,16,.88);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.card.pad{padding:16px}.workout-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px;border-bottom:1px solid var(--border)}.workout-title{font-size:20px;font-weight:900}.workout-sub{color:var(--muted);font-size:12px;margin-top:2px}.btnrow{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border2);background:var(--bg3);color:var(--text);border-radius:13px;padding:10px 13px;font-size:13px;font-weight:850;min-height:42px}.btn:hover{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#08070b;border-color:transparent}.btn.ghost{background:transparent;color:var(--muted)}.btn.bad{color:var(--bad);border-color:rgba(255,107,138,.35);background:rgba(255,107,138,.08)}.btn.small{padding:7px 10px;min-height:34px;font-size:12px}
-    table{width:100%;border-collapse:collapse}th{font-size:11px;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.1em;padding:10px 14px;border-bottom:1px solid var(--border)}td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}tr:last-child td{border-bottom:0}.exname{font-weight:850}.meta{color:var(--muted);font-size:12px;margin-top:2px}.mono{font-variant-numeric:tabular-nums;color:var(--soft)}.badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border2);border-radius:999px;padding:4px 9px;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.badge.increase{color:#0b0a10;background:var(--accent2);border-color:transparent}.badge.repeat{color:var(--blue);background:rgba(179,199,255,.1);border-color:rgba(179,199,255,.24)}.badge.reduce{color:var(--warn);background:rgba(214,188,250,.1);border-color:rgba(214,188,250,.24)}.badge.rest{color:var(--bad);background:rgba(255,107,138,.1);border-color:rgba(255,107,138,.26)}.badge.complete{color:#0b0a10;background:#fff;border-color:transparent}
-    .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.formgrid.four{grid-template-columns:repeat(4,1fr)}.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:850}input,select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:13px;color:var(--text);padding:12px 13px;min-height:44px}textarea{min-height:120px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}select option{background:var(--bg2)}.decision{display:none;margin-top:12px;border:1px solid var(--border2);background:var(--bg3);border-radius:16px;padding:13px}.decision.show{display:block}.decision h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px}.decision p{color:var(--muted);font-size:13px;margin-top:7px}.stack{display:flex;flex-direction:column;gap:10px}.history-card{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px}.history-card .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.history-card h3{font-size:14px}.history-card .line{color:var(--muted);font-size:12px;margin-top:4px}.filters{display:flex;gap:8px;overflow:auto;padding-bottom:4px}.filters button{white-space:nowrap;border:1px solid var(--border);background:var(--bg3);color:var(--muted);border-radius:999px;padding:8px 11px;font-size:12px;font-weight:850}.filters button.active{color:var(--text);border-color:var(--accent);background:rgba(159,122,234,.12)}
-    .schedule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.day-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;overflow:hidden}.day-head{padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}.circle{height:31px;width:31px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(159,122,234,.35);color:var(--accent3);background:rgba(159,122,234,.12);font-weight:900}.day-head h3{font-size:14px}.day-head p{font-size:12px;color:var(--muted)}.exrow{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px}.exrow:last-child{border-bottom:0}.exrow span:last-child{color:var(--muted);white-space:nowrap}
-    .auth,.profile-screen{position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% -10%, rgba(159,122,234,.25), transparent 35%),var(--bg);display:none;align-items:flex-start;justify-content:flex-start;padding:24px;overflow:auto}.auth.show,.profile-screen.show{display:flex}.auth-card,.profile-card{width:min(520px,100%);background:rgba(12,12,16,.94);border:1px solid var(--border2);border-radius:26px;padding:24px;box-shadow:var(--shadow);max-height:calc(100vh - 80px);overflow:auto}.auth-card h1,.profile-card h1{font-size:26px;text-transform:uppercase;letter-spacing:.16em}.auth-card p,.profile-card p{color:var(--muted);margin:10px 0 18px}.small{font-size:12px;color:var(--muted)}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.profile-btn{text-align:left;border:1px solid var(--border2);background:var(--bg3);border-radius:18px;padding:16px;color:var(--text);min-height:92px}.profile-btn strong{display:block;font-size:18px}.profile-btn span{display:block;color:var(--muted);font-size:12px;margin-top:4px}.profile-btn.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}.day-goal-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
-    .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,80px);opacity:0;transition:.24s;z-index:2000;background:var(--bg2);border:1px solid var(--border2);border-radius:999px;padding:12px 16px;color:var(--text);box-shadow:var(--shadow);font-weight:850}.toast.show{transform:translate(-50%,0);opacity:1}.bottomnav{display:none;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:80;background:rgba(12,12,16,.9);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:22px;padding:7px;box-shadow:var(--shadow)}.bottomnav button{flex:1;background:transparent;border:0;color:var(--muted);border-radius:16px;padding:9px 4px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.04em}.bottomnav button.active{background:rgba(159,122,234,.16);color:var(--text)}
-    .empty{padding:42px 20px;text-align:center;color:var(--muted)}.empty h3{font-size:20px;color:var(--faint);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}.warnbox{border:1px solid rgba(214,188,250,.28);background:rgba(214,188,250,.07);border-radius:16px;padding:13px;color:var(--soft);font-size:13px}.warnbox.bad{border-color:rgba(255,107,138,.32);background:rgba(255,107,138,.08)}.warnbox.ok{border-color:rgba(183,148,244,.35);background:rgba(183,148,244,.08)}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent3)}.bar{height:9px;background:var(--border);border-radius:999px;overflow:hidden;margin-top:8px}.bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#fff);width:0%}.leader-row{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:13px 14px;border-bottom:1px solid var(--border)}.leader-row:last-child{border-bottom:0}.rank{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(159,122,234,.14);border:1px solid rgba(159,122,234,.25);font-weight:900}.leader-name{font-weight:900}.leader-sub{color:var(--muted);font-size:12px;margin-top:2px}.pct{font-size:20px;font-weight:950}
-    @media(max-width:900px){.app{padding:12px 12px 96px}.topbar{padding:10px 12px}.nav{display:none}.bottomnav{display:flex}.brand h1{font-size:14px}.brand p{display:none}.sync{margin-left:auto}.grid3,.grid4{grid-template-columns:1fr 1fr}.grid3 .stat:nth-child(2){grid-column:1/-1;order:-1}.stat{min-height:auto;padding:14px}.stat .value{font-size:28px}.workout-head{align-items:flex-start;flex-direction:column}.formgrid,.formgrid.four{grid-template-columns:1fr 1fr}.schedule-grid{grid-template-columns:1fr}.tablewrap{overflow:auto}.desktop-table.history{display:none}.history-card{display:block}.card.pad{padding:14px}th,td{padding:10px}.section{margin-top:18px}}
-    @media(max-width:480px){.formgrid,.formgrid.four,.grid3,.grid4,.profile-grid{grid-template-columns:1fr}.btnrow .btn{flex:1}.toast{width:calc(100% - 28px);text-align:center}.workout-title{font-size:18px}.leader-row{grid-template-columns:34px 1fr}.pct{grid-column:2}}
-  </style>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div id="auth" class="auth">
@@ -52,8 +21,8 @@
       <div class="sigil" style="margin-bottom:16px"></div>
       <h1>Divinity</h1>
       <div class="field"><label>Email</label><input id="login-email" type="email" autocomplete="email" placeholder="shared@email.com"></div>
-      <div class="field" style="margin-top:10px"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Shared site password" onkeydown="if(event.key==='Enter')signInPassword()"></div>
-      <div class="btnrow" style="margin-top:12px"><button class="btn primary" onclick="signInPassword()">Login</button><button class="btn ghost" onclick="resetPassword()">Reset</button></div>
+      <div class="field" style="margin-top:10px"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Shared site password"></div>
+      <div class="btnrow" style="margin-top:12px"><button class="btn primary" data-action="sign-in">Login</button><button class="btn ghost" data-action="reset-password">Reset</button></div>
       <p id="auth-msg" class="small"></p>
     </div>
   </div>
@@ -63,24 +32,17 @@
       <div class="sigil" style="margin-bottom:16px"></div>
       <h1>Choose profile</h1>
       <div id="profile-grid" class="profile-grid"></div>
-      <div class="btnrow" style="margin-top:14px"><button class="btn ghost" onclick="hideProfilePicker()">Keep current</button><button class="btn bad" onclick="signOut()">Logout</button></div>
+      <div class="btnrow" style="margin-top:14px"><button class="btn ghost" data-action="hide-profile-picker">Keep current</button><button class="btn bad" data-action="sign-out">Logout</button></div>
     </div>
   </div>
 
   <header class="topbar">
     <div class="brand"><div class="sigil"></div><div><h1>Divinity</h1><p id="brand-sub">Group training tracker</p></div></div>
-    <nav class="nav">
-      <button class="active" data-page="dashboard" onclick="showPage('dashboard')">Dashboard</button>
-      <button data-page="log" onclick="showPage('log')">Log</button>
-      <button data-page="goals" onclick="showPage('goals')">Goals</button>
-      <button data-page="history" onclick="showPage('history')">History</button>
-      <button data-page="schedule" onclick="showPage('schedule')">Schedule</button>
-      <button data-page="settings" onclick="showPage('settings')">Settings</button>
-    </nav>
+    <nav id="desktop-nav" class="nav"></nav>
     <div class="account-actions">
-      <button class="mini-btn" id="active-profile-btn" onclick="showProfilePicker()">Profile</button>
+      <button class="mini-btn" id="active-profile-btn" data-action="show-profile-picker">Profile</button>
       
-      <button class="mini-btn danger" onclick="signOut()">Logout</button>
+      <button class="mini-btn danger" data-action="sign-out">Logout</button>
     </div>
     <div class="sync"><span id="sync-dot" class="dot"></span><span id="sync-text">Loading</span></div>
   </header>
@@ -96,9 +58,8 @@
 
       <div class="section"><h2>Next workout</h2><span class="tag purple" id="next-tag">Day 1</span></div>
       <div class="card" id="next-card"></div>
-      <div id="goals-summary"></div>
 
-      <div class="section"><h2>Recent entries</h2><button class="btn ghost" onclick="loadAllData()">Refresh</button></div>
+      <div class="section"><h2>Recent entries</h2><button class="btn ghost" data-action="refresh">Refresh</button></div>
       <div class="card tablewrap"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Decision</th></tr></thead><tbody id="recent-body"></tbody></table><div id="recent-empty" class="empty"><h3>No logs yet</h3><p>Go to Log and save the first set.</p></div></div>
     </section>
 
@@ -106,10 +67,10 @@
       <div class="section"><h2>Log set</h2><span class="tag purple" id="log-profile-tag">Profile</span></div>
       <div class="card pad">
         <div class="formgrid">
-          <div class="field"><label>Profile</label><select id="log-profile" onchange="switchProfile(this.value)"></select></div>
-          <div class="field"><label>Loop day</label><select id="log-day" onchange="fillExercisesForDay()"></select></div>
+          <div class="field"><label>Profile</label><select id="log-profile"></select></div>
+          <div class="field"><label>Loop day</label><select id="log-day"></select></div>
         </div>
-        <div class="field" style="margin-top:12px"><label>Exercise</label><select id="log-ex" onchange="setDefaultRange(); renderLogPreview()"></select></div>
+        <div class="field" style="margin-top:12px"><label>Exercise</label><select id="log-ex"></select></div>
         <div class="formgrid four" style="margin-top:12px">
           <div class="field"><label>Load kg</label><input id="log-load" type="number" step="0.5" placeholder="60"></div>
           <div class="field"><label>Set 1 reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
@@ -120,7 +81,7 @@
           <div class="field"><label>Rep target</label><select id="log-range"><option value="4-7">4–7 stable compounds</option><option value="6-10">6–10 isolations</option><option value="8-15">8–15 raises</option><option value="6-12">6–12 calves</option></select></div>
           <div class="field"><label>Notes</label><input id="log-notes" type="text" placeholder="Form clean, slight fatigue..."></div>
         </div>
-        <div class="btnrow" style="margin-top:14px"><button class="btn primary" onclick="addEntry()">Save set</button><button class="btn" onclick="markWorkoutComplete()">Complete workout</button><button class="btn ghost" onclick="clearForm()">Clear</button></div>
+        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="add-entry">Save set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button></div>
         <div id="log-preview" style="margin-top:16px"></div>
         <div id="decision" class="decision"><h3>Next decision</h3><div id="decision-main"></div><p id="decision-reason"></p></div>
       </div>
@@ -128,23 +89,8 @@
       <div class="card tablewrap"><table><thead><tr><th>Exercise</th><th>Load</th><th>Last reps</th><th>Target</th><th>Decision</th></tr></thead><tbody id="loads-body"></tbody></table><div id="loads-empty" class="empty"><h3>No current loads</h3><p>Save sets to build this list.</p></div></div>
     </section>
 
-    <section id="page-goals" class="page">
-      <div class="section"><h2>Goals</h2><span class="tag purple">Daily habits</span></div>
-      <div class="card pad">
-        <div class="formgrid">
-          <div class="field"><label>New goal</label><input id="goal-text" type="text" placeholder="e.g. 10 minutes mobility"></div>
-          <div class="field" style="display:flex;align-items:flex-end;"><button class="btn primary" onclick="addGoal()">Create goal</button></div>
-        </div>
-        <div id="goal-list" class="stack" style="margin-top:16px"></div>
-      </div>
-      <div class="card pad" style="margin-top:16px">
-        <div class="section" style="margin-top:0"><h2>Today's checklist</h2><span class="tag white">Auto reset daily</span></div>
-        <div id="goal-day-list" class="stack" style="margin-top:12px"></div>
-      </div>
-    </section>
-
     <section id="page-history" class="page">
-      <div class="section"><h2>History</h2><button class="btn bad" onclick="clearProfileData()">Delete profile data</button></div>
+      <div class="section"><h2>History</h2><button class="btn bad" data-action="clear-profile-data">Delete profile data</button></div>
       <div class="filters" id="filters"></div>
       <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>S1</th><th>S2</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
       <div class="stack" id="hist-cards"></div>
@@ -156,20 +102,20 @@
     </section>
 
     <section id="page-settings" class="page">
-      <div class="section"><h2>Settings</h2><div class="btnrow"><button class="btn" onclick="showProfilePicker()">Switch profile</button><button class="btn bad" onclick="signOut()">Logout</button></div></div>
+      <div class="section"><h2>Settings</h2><div class="btnrow"><button class="btn" data-action="show-profile-picker">Switch profile</button><button class="btn bad" data-action="sign-out">Logout</button></div></div>
       <div class="grid3">
-        <div class="stat"><div class="label">Selected profile</div><div class="value" id="settings-profile">Alfred</div><div class="sub"><button class="btn small ghost" onclick="showProfilePicker()">Switch profile</button></div></div>
+        <div class="stat"><div class="label">Selected profile</div><div class="value" id="settings-profile">Alfred</div><div class="sub"><button class="btn small ghost" data-action="show-profile-picker">Switch profile</button></div></div>
         <div class="stat"><div class="label">Estimated DB use</div><div class="value" id="usage-mb">0 MB</div><div class="sub" id="usage-sub">safe</div></div>
         <div class="stat"><div class="label">Rows</div><div class="value" id="usage-rows">0</div><div class="sub">logs + settings</div></div>
       </div>
       <div class="card pad">
         <div class="section" style="margin-top:0"><h2>Edit profile schedule</h2><span class="tag" id="edit-profile-tag">Profile</span></div>
         <div class="formgrid">
-          <div class="field"><label>Profile</label><select id="edit-profile" onchange="loadEditorForProfile(this.value)"></select></div>
+          <div class="field"><label>Profile</label><select id="edit-profile"></select></div>
           <div class="field"><label>Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>
         </div>
         <div id="schedule-editor" class="stack" style="margin-top:12px"></div>
-        <div class="btnrow" style="margin-top:14px"><button class="btn primary" onclick="saveEditedSchedule()">Save schedule</button><button class="btn ghost" onclick="resetEditedSchedule()">Reset selected default</button><button class="btn" onclick="exportBackup()">Export backup</button></div>
+        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="save-schedule">Save schedule</button><button class="btn ghost" data-action="reset-schedule">Reset selected default</button><button class="btn" data-action="export-backup">Export backup</button></div>
       </div>
       <div class="warnbox" style="margin-top:12px">
         <b>Storage alert:</b> the public site cannot read exact Supabase database size without a secret admin key. Divinity estimates usage from row counts and warns long before the free 500 MB database limit.
@@ -178,295 +124,10 @@
     </section>
   </main>
 
-  <nav class="bottomnav">
-    <button class="active" data-page="dashboard" onclick="showPage('dashboard')">Home</button>
-    <button data-page="log" onclick="showPage('log')">Log</button>
-    <button data-page="goals" onclick="showPage('goals')">Goals</button>
-    <button data-page="history" onclick="showPage('history')">History</button>
-    <button data-page="settings" onclick="showPage('settings')">More</button>
-  </nav>
+  <nav id="mobile-nav" class="bottomnav"></nav>
 
   <div id="toast" class="toast"></div>
 
-<script>
-const SUPABASE_URL = "https://txdiazrvochdrlmlahbo.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_c2FUhLGrPLvD8w6dj74TCQ_xolv2TEy";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-const PROFILES = [{"key": "alfred", "name": "Alfred", "color": "#b794f4", "defaultExpected": 6, "defaultSchedule": [{"day": "Day 1", "type": "Upper", "title": "Upper — back priority", "focus": "Back first", "exs": [["Wide-grip lat pulldown", "1–2", "4–7", "Back first"], ["Close-grip cable row", "1", "4–7", "Row / shoulder extension"], ["Pec deck", "1", "6–10", "Chest maintenance"], ["Rope triceps extension", "1–2", "6–10", "Direct triceps"], ["Curl variation", "1–2", "6–10", "Direct biceps"], ["Lateral raise", "1 optional", "8–15", "Only if side delts lag"]]}, {"day": "Day 2", "type": "Lower", "title": "Lower — hinge + quad", "focus": "Hinge first", "exs": [["Stiff-leg deadlift", "1–2", "4–7", "Hinge priority"], ["Leg curl", "1", "6–10", "Short-head coverage"], ["Leg press / squat", "1–2", "4–7", "Quad stimulus"], ["Calf raise", "1–2", "6–12", "Controlled stretch"]]}, {"day": "Day 3", "type": "Upper", "title": "Upper — chest priority", "focus": "Chest first", "exs": [["Incline press", "2", "4–7", "Chest priority"], ["Pec deck", "1", "6–10", "Horizontal adduction"], ["Wide-grip lat pulldown", "1–2", "4–7", "Lat stimulus"], ["JM press", "1", "4–7", "Triceps"], ["Rope extension", "1", "6–10", "All heads"], ["Curl variation", "1–2", "6–10", "Direct biceps"]]}, {"day": "Day 4", "type": "Lower", "title": "Lower — quad + curl", "focus": "Quad first", "exs": [["Squat variation", "1–2", "4–7", "Quad priority"], ["Leg extension", "1", "6–10", "Knee extension"], ["Leg curl", "2", "6–10", "Curl priority, no hinge"], ["Calf raise", "1–2", "6–12", "Calves"]]}, {"day": "Day 5", "type": "Upper", "title": "Upper — shoulder priority", "focus": "Shoulders first", "exs": [["Overhead press", "1–2", "4–7", "Shoulder priority"], ["Lateral raise", "1–2", "8–15", "Side delts"], ["Pec deck", "1", "6–10", "No incline today"], ["Single-arm lat pulldown", "1–2", "6–10", "Different lat angle"], ["Rope extension", "1–2", "6–10", "Direct triceps"], ["Curl variation", "1–2", "6–10", "Direct biceps"]]}, {"day": "Day 6", "type": "Lower", "title": "Lower — hinge + quad", "focus": "Hinge first", "exs": [["Stiff-leg deadlift", "2", "4–7", "Hinge priority"], ["Leg curl", "1", "6–10", "Knee flexion coverage"], ["Leg press", "1–2", "4–7", "Quad stimulus"], ["Calf raise", "1–2", "6–12", "Calves"]]}]}, {"key": "maja", "name": "Maja", "color": "#ffffff", "defaultExpected": 3, "defaultSchedule": [{"day": "Day 1", "type": "Full body", "title": "Full Body A", "focus": "Squat + push", "exs": [["Leg press / squat", "2", "6–10", "Main lower"], ["Incline press", "2", "6–10", "Push"], ["Wide-grip lat pulldown", "2", "6–10", "Pull"], ["Leg curl", "1–2", "8–12", "Hamstrings"], ["Curl variation", "1", "8–12", "Optional"]]}, {"day": "Day 2", "type": "Full body", "title": "Full Body B", "focus": "Hinge + pull", "exs": [["Stiff-leg deadlift", "2", "6–10", "Hinge"], ["Close-grip cable row", "2", "6–10", "Back"], ["Pec deck", "1–2", "8–12", "Chest"], ["Lateral raise", "1–2", "10–15", "Side delts"], ["Rope triceps extension", "1", "8–12", "Optional"]]}, {"day": "Day 3", "type": "Full body", "title": "Full Body C", "focus": "Quad + shoulders", "exs": [["Squat variation", "2", "6–10", "Quad"], ["Overhead press", "1–2", "6–10", "Shoulders"], ["Single-arm lat pulldown", "2", "8–12", "Back"], ["Leg extension", "1–2", "8–12", "Quads"], ["Calf raise", "1–2", "8–15", "Calves"]]}]}, {"key": "elias", "name": "Elias", "color": "#d6bcfa", "defaultExpected": 4, "defaultSchedule": [{"day": "Day 1", "type": "Upper", "title": "Upper A", "focus": "Push/pull", "exs": [["Incline press", "2", "6–10", "Chest"], ["Wide-grip lat pulldown", "2", "6–10", "Back"], ["Pec deck", "1", "8–12", "Chest"], ["Curl variation", "1–2", "8–12", "Biceps"], ["Rope triceps extension", "1–2", "8–12", "Triceps"]]}, {"day": "Day 2", "type": "Lower", "title": "Lower A", "focus": "Quad", "exs": [["Leg press / squat", "2", "6–10", "Quads"], ["Leg curl", "2", "8–12", "Hamstrings"], ["Leg extension", "1", "8–12", "Quads"], ["Calf raise", "2", "8–15", "Calves"]]}, {"day": "Day 3", "type": "Upper", "title": "Upper B", "focus": "Shoulders/back", "exs": [["Overhead press", "2", "6–10", "Shoulders"], ["Close-grip cable row", "2", "6–10", "Back"], ["Lateral raise", "1–2", "10–15", "Side delts"], ["Pec deck", "1", "8–12", "Chest"], ["Curl variation", "1", "8–12", "Biceps"]]}, {"day": "Day 4", "type": "Lower", "title": "Lower B", "focus": "Hinge", "exs": [["Stiff-leg deadlift", "2", "6–10", "Hinge"], ["Squat variation", "1–2", "6–10", "Quads"], ["Leg curl", "1", "8–12", "Hamstrings"], ["Calf raise", "2", "8–15", "Calves"]]}]}, {"key": "jacqueline", "name": "Jacqueline", "color": "#c4b5fd", "defaultExpected": 3, "defaultSchedule": [{"day": "Day 1", "type": "Full body", "title": "Full Body A", "focus": "Squat + push", "exs": [["Leg press / squat", "2", "6–10", "Main lower"], ["Incline press", "2", "6–10", "Push"], ["Wide-grip lat pulldown", "2", "6–10", "Pull"], ["Leg curl", "1–2", "8–12", "Hamstrings"], ["Curl variation", "1", "8–12", "Optional"]]}, {"day": "Day 2", "type": "Full body", "title": "Full Body B", "focus": "Hinge + pull", "exs": [["Stiff-leg deadlift", "2", "6–10", "Hinge"], ["Close-grip cable row", "2", "6–10", "Back"], ["Pec deck", "1–2", "8–12", "Chest"], ["Lateral raise", "1–2", "10–15", "Side delts"], ["Rope triceps extension", "1", "8–12", "Optional"]]}, {"day": "Day 3", "type": "Full body", "title": "Full Body C", "focus": "Quad + shoulders", "exs": [["Squat variation", "2", "6–10", "Quad"], ["Overhead press", "1–2", "6–10", "Shoulders"], ["Single-arm lat pulldown", "2", "8–12", "Back"], ["Leg extension", "1–2", "8–12", "Quads"], ["Calf raise", "1–2", "8–15", "Calves"]]}]}];
-const COMPLETE_EX = "__WORKOUT_COMPLETE__";
-let entries = [];
-let profileSettings = {};
-let user = null;
-let currentProfileKey = localStorage.getItem("divinity-profile") || "alfred";
-let histFilter = "all";
-let editorProfileKey = "alfred";
-
-function qs(id){return document.getElementById(id)}
-function profileByKey(key){return PROFILES.find(p=>p.key===key)||PROFILES[0]}
-function activeProfile(){return profileByKey(currentProfileKey)}
-function activeSettings(key=currentProfileKey){return profileSettings[key] || {...profileByKey(key), schedule_json: profileByKey(key).defaultSchedule, expected_sessions_per_week: profileByKey(key).defaultExpected}}
-function activeSchedule(key=currentProfileKey){return activeSettings(key).schedule_json || profileByKey(key).defaultSchedule}
-function toast(msg){const t=qs("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}
-function setSync(status,msg){const d=qs("sync-dot"), s=qs("sync-text"); d.className="dot "+(status||""); s.textContent=msg;}
-function setActiveButtons(page){document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===page))}
-function showPage(page){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));qs("page-"+page).classList.add("active");setActiveButtons(page);renderAll()}
-function showProfilePicker(){renderProfilePicker();qs("profile-screen").classList.add("show")}
-function hideProfilePicker(){qs("profile-screen").classList.remove("show")}
-
-async function signInPassword(){
-  const email=qs("login-email").value.trim(), password=qs("login-password").value;
-  if(!email||!password){qs("auth-msg").textContent="Enter email and password.";return}
-  qs("auth-msg").textContent="Logging in...";
-  const {error}=await supabaseClient.auth.signInWithPassword({email,password});
-  if(error){qs("auth-msg").textContent=error.message;return}
-  await checkAuth();
-}
-async function resetPassword(){
-  const email=qs("login-email").value.trim();
-  if(!email){qs("auth-msg").textContent="Enter email first.";return}
-  const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
-  qs("auth-msg").textContent=error?error.message:"Password reset email sent.";
-}
-async function signOut(){await supabaseClient.auth.signOut();location.reload()}
-async function getUser(){const {data}=await supabaseClient.auth.getUser();return data.user}
-async function checkAuth(){
-  setSync("", "Checking");
-  user=await getUser();
-  if(!user){qs("auth").classList.add("show");setSync("bad","Signed out");return}
-  qs("auth").classList.remove("show");
-  await loadAllData();
-  if(!localStorage.getItem("divinity-profile")) showProfilePicker();
-}
-
-function renderProfilePicker(){
-  qs("profile-grid").innerHTML = PROFILES.map(p=>`<button class="profile-btn ${p.key===currentProfileKey?'active':''}" onclick="switchProfile('${p.key}', true)"><strong>${p.name}</strong><span>${activeSettings(p.key).expected_sessions_per_week} expected sessions / week</span></button>`).join("");
-}
-
-async function ensureProfileSettings(){
-  for(const p of PROFILES){
-    if(profileSettings[p.key]) continue;
-    const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
-    const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});
-    if(error) throw error;
-    profileSettings[p.key]={...p,...row};
-  }
-}
-
-async function loadAllData(show=true){
-  if(show) setSync("", "Loading");
-  user = user || await getUser();
-  if(!user){entries=[];renderAll();return}
-  const s = await supabaseClient.from("profile_settings").select("*").eq("user_id",user.id);
-  if(s.error){setSync("bad","SQL needed");alert("Run the new SQL migration first. Missing profile_settings or policy.\n\n"+s.error.message);return}
-  profileSettings={};
-  (s.data||[]).forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r}});
-  await ensureProfileSettings();
-  const e = await supabaseClient.from("workout_entries").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
-  if(e.error){setSync("bad","SQL needed");alert("Run the SQL migration first. Missing profile_key or policy.\n\n"+e.error.message);return}
-  entries=(e.data||[]).map(r=>({id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,title:r.workout_title,ex:r.exercise,load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,created:r.created_at}));
-  setSync("ok","Synced");
-  renderAll();
-}
-
-function switchProfile(key, close=false){
-  currentProfileKey=key;localStorage.setItem("divinity-profile",key);
-  if(close) hideProfilePicker();
-  renderAll();
-  fillDaySelect();
-}
-function profileEntries(key=currentProfileKey){return entries.filter(e=>e.profile===key)}
-function completedEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex===COMPLETE_EX&&!e.isRest)}
-function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest)}
-function scheduleByDay(day,key=currentProfileKey){return activeSchedule(key).find(x=>x.day===day)||activeSchedule(key)[0]}
-function nextDayIndex(key=currentProfileKey){const c=completedEntries(key)[0]; if(!c) return 0; const idx=parseInt(String(c.day).replace("Day ",""))-1; return (idx+1)%activeSchedule(key).length}
-function latestSetFor(ex,key=currentProfileKey){return setEntries(key).find(e=>e.ex===ex)}
-function decisionClass(d){return d==="increase"?"increase":d==="reduce"?"reduce":d==="rest"?"rest":d==="complete"?"complete":"repeat"}
-
-function decide(s1,s2,rir,range){
-  const [min,max]=range.split("-").map(Number); const sets=s2>0?[s1,s2]:[s1];
-  if(sets.some(r=>r<min)) return {decision:"reduce",label:"Repeat or reduce",reason:"A set fell below the target range.",cls:"reduce"};
-  if(rir>2) return {decision:"rest",label:"Check recovery",reason:"RIR is high. Check effort, form, or fatigue before adding load.",cls:"rest"};
-  if(sets.every(r=>r>=max) && rir<=1) return {decision:"increase",label:"Increase load",reason:"Top of range reached with ≤1 RIR.",cls:"increase"};
-  if(sets.every(r=>r>=max) && rir>1) return {decision:"repeat",label:"Repeat, push harder",reason:"Top reps reached but RIR suggests more available.",cls:"repeat"};
-  return {decision:"repeat",label:"Repeat load",reason:"Within range, not fully maxed yet.",cls:"repeat"};
-}
-function defaultRangeFor(ex){
-  if(/lateral/i.test(ex)) return "8-15";
-  if(/calf/i.test(ex)) return "6-12";
-  if(/curl|extension|pec deck/i.test(ex) && !/stiff/i.test(ex)) return "6-10";
-  return "4-7";
-}
-function fillProfileSelects(){
-  const opts=PROFILES.map(p=>`<option value="${p.key}">${p.name}</option>`).join("");
-  ["log-profile","edit-profile"].forEach(id=>{if(qs(id)) qs(id).innerHTML=opts});
-  qs("log-profile").value=currentProfileKey;
-}
-function fillDaySelect(){
-  if(!qs("log-day")) return;
-  fillProfileSelects();
-  const sched=activeSchedule(currentProfileKey);
-  qs("log-day").innerHTML=sched.map(d=>`<option value="${d.day}">${d.day} — ${d.title}</option>`).join("");
-  qs("log-day").value=sched[nextDayIndex(currentProfileKey)].day;
-  fillExercisesForDay();
-}
-function dayEntries(day,key=currentProfileKey){return setEntries(key).filter(e=>e.day===day)}
-function lastLoggedExerciseForDay(day,key=currentProfileKey){const dayLog=dayEntries(day,key);return dayLog.length?dayLog[0].ex:null}
-function nextExerciseForDay(day,key=currentProfileKey){const d=scheduleByDay(day,key);const last=lastLoggedExerciseForDay(day,key);if(!last) return d.exs[0][0];const idx=d.exs.findIndex(e=>e[0]===last);return d.exs[(idx+1+d.exs.length)%d.exs.length][0]}
-function renderLogPreview(){const ex=qs("log-ex")?.value; if(!ex) return; const last=latestSetFor(ex); if(!last){qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${ex}</strong>. No recent set yet.</div>`; return;} qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${ex}</strong>. Last saved ${last.load??"—"} kg, ${last.s1}${last.s2?"/"+last.s2:""} reps, ${last.decision}.</div>`}
-function fillExercisesForDay(){
-  const d=scheduleByDay(qs("log-day").value,currentProfileKey);
-  qs("log-ex").innerHTML=d.exs.map(e=>`<option value="${e[0]}">${e[0]}</option>`).join("");
-  qs("log-ex").value=nextExerciseForDay(qs("log-day").value,currentProfileKey);
-  setDefaultRange();
-  renderLogPreview();
-}
-function setDefaultRange(){qs("log-range").value=defaultRangeFor(qs("log-ex").value)}
-function clearForm(){["log-load","log-s1","log-s2","log-rir","log-notes"].forEach(id=>qs(id).value="");qs("decision").classList.remove("show");renderLogPreview()}
-
-async function insertRow(row){
-  user = user || await getUser();
-  if(!user){qs("auth").classList.add("show");toast("Sign in first");return false}
-  setSync("", "Saving");
-  const {error}=await supabaseClient.from("workout_entries").insert({...row,user_id:user.id,profile_key:currentProfileKey,profile_name:activeProfile().name});
-  if(error){setSync("bad","Error");alert(error.message);return false}
-  setSync("ok","Synced"); await loadAllData(false); return true;
-}
-async function addEntry(){
-  const day=qs("log-day").value, ex=qs("log-ex").value, load=parseFloat(qs("log-load").value), s1=parseInt(qs("log-s1").value), s2=parseInt(qs("log-s2").value)||0, rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
-  if(isNaN(load)||!s1||isNaN(rir)){toast("Fill load, set 1, and RIR");return}
-  const dec=decide(s1,s2,rir,range); const d=scheduleByDay(day);
-  const ok=await insertRow({entry_date:new Date().toISOString().slice(0,10),loop_day:day,workout_title:d.title,exercise:ex,load_kg:load,set_1_reps:s1,set_2_reps:s2||null,rir,rep_range:range,decision:dec.decision,notes,is_rest_day:false});
-  if(ok){
-    qs("decision").classList.add("show");
-    qs("decision-main").innerHTML=`<span class="badge ${dec.cls}">${dec.label}</span>`;
-    qs("decision-reason").textContent=dec.reason;
-    toast("Set saved");
-    clearForm();
-    qs("log-ex").value=nextExerciseForDay(day,currentProfileKey);
-    setDefaultRange();
-    renderLogPreview();
-  }
-}
-async function markWorkoutComplete(){
-  const day=qs("log-day").value, d=scheduleByDay(day);
-  const ok=await insertRow({entry_date:new Date().toISOString().slice(0,10),loop_day:day,workout_title:d.title,exercise:COMPLETE_EX,decision:"complete",notes:"Workout completed",is_rest_day:false});
-  if(ok){toast(`${activeProfile().name}: ${day} completed`); fillDaySelect(); showPage("dashboard")}
-}
-async function markWorkoutCompleteFromDashboard(){const n=activeSchedule()[nextDayIndex()]; qs("log-day").value=n.day; await markWorkoutComplete()}
-async function logRestDay(){
-  const n=activeSchedule()[nextDayIndex()];
-  const ok=await insertRow({entry_date:new Date().toISOString().slice(0,10),loop_day:n.day,workout_title:"Rest day",exercise:"Rest day",decision:"rest",notes:"Recovery day",is_rest_day:true});
-  if(ok) toast("Rest day logged");
-}
-async function deleteEntry(id){ if(!confirm("Delete this entry?"))return; const {error}=await supabaseClient.from("workout_entries").delete().eq("id",id); if(error){alert(error.message);return} await loadAllData(false); toast("Deleted") }
-async function clearProfileData(){ if(!confirm(`Delete ALL data for ${activeProfile().name}?`))return; const {error}=await supabaseClient.from("workout_entries").delete().eq("user_id",user.id).eq("profile_key",currentProfileKey); if(error){alert(error.message);return} await loadAllData(false); toast("Profile data deleted") }
-
-function usageEstimate(){
-  const rows=entries.length+Object.keys(profileSettings).length;
-  const mb=(entries.length*3 + Object.keys(profileSettings).length*12)/1024;
-  const pct=Math.min(100,(mb/500)*100);
-  let level="ok", msg="Storage estimate is safe.";
-  if(mb>350){level="warn";msg="Storage estimate is getting high. Export a backup and consider pruning old notes."}
-  if(mb>450){level="bad";msg="Storage estimate is near the free 500 MB database limit."}
-  return {rows,mb,pct,level,msg};
-}
-
-function renderDashboard(){
-  const n=activeSchedule()[nextDayIndex()];
-  qs("brand-sub").textContent=`${activeProfile().name} · group tracker`;
-  if(qs("active-profile-btn")) qs("active-profile-btn").textContent=activeProfile().name;
-  qs("stat-workouts").textContent=completedEntries().length;
-  qs("stat-next").textContent=n.day;
-  qs("stat-next-title").textContent=n.title;
-  qs("next-tag").textContent=`${activeProfile().name} · ${n.type}`;
-  const u=usageEstimate();
-  qs("usage-alert").style.display=u.level==="ok"?"none":"block";
-  qs("usage-alert").className="warnbox "+u.level;
-  qs("usage-alert").innerHTML=`<b>Storage alert:</b> ${u.msg} Estimated database use: ${u.mb.toFixed(2)} MB / 500 MB.`;
-  qs("next-card").innerHTML=`<div class="workout-head"><div><div class="workout-title">${n.title}</div><div class="workout-sub">${activeProfile().name} · ${n.focus}. Complete this workout to advance this profile's loop.</div></div><div class="btnrow"><button class="btn primary" onclick="showPage('log')">Log set</button><button class="btn" onclick="markWorkoutCompleteFromDashboard()">Complete</button><button class="btn ghost" onclick="logRestDay()">Rest</button></div></div><div class="tablewrap"><table><thead><tr><th>Exercise</th><th>Sets</th><th>Target</th><th>Last load</th><th>Decision</th></tr></thead><tbody>${n.exs.map(e=>{const last=latestSetFor(e[0]);return `<tr><td><div class="exname">${e[0]}</div><div class="meta">${e[3]||""}</div></td><td class="mono">${e[1]}</td><td class="mono">${e[2]}</td><td class="mono">${last&&last.load!=null?last.load+" kg":"—"}</td><td>${last?`<span class="badge ${decisionClass(last.decision)}">${last.decision}</span>`:'<span class="meta">—</span>'}</td></tr>`}).join("")}</tbody></table></div>`;
-  const recent=setEntries().slice(0,8); qs("recent-empty").style.display=recent.length?"none":"block"; qs("recent-body").innerHTML=recent.map(rowHtml).join("");
-  qs("log-profile-tag").textContent=activeProfile().name;
-}
-function rowHtml(e){return `<tr><td class="mono">${e.date}</td><td>${profileByKey(e.profile).name}</td><td><span class="tag">${e.day}</span></td><td>${e.ex}</td><td class="mono">${e.load??"—"}${e.load!=null?" kg":""}</td><td class="mono">${e.s1}${e.s2?"/"+e.s2:""}</td><td><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></td></tr>`}
-function renderLoads(){
-  const map={}; setEntries().forEach(e=>{if(!map[e.ex])map[e.ex]=e});
-  const rows=Object.values(map); qs("loads-empty").style.display=rows.length?"none":"block";
-  qs("loads-body").innerHTML=rows.map(e=>`<tr><td>${e.ex}</td><td class="mono">${e.load} kg</td><td class="mono">${e.s1}${e.s2?"/"+e.s2:""}</td><td class="mono">${e.range}</td><td><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></td></tr>`).join("");
-}
-function buildFilters(){const fs=["all","current","Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","increase","complete"]; qs("filters").innerHTML=fs.map(f=>`<button class="${histFilter===f?'active':''}" onclick="histFilter='${f}';renderHistory()">${f}</button>`).join("")}
-function renderHistory(){
-  buildFilters(); let rows=entries;
-  if(histFilter==="current") rows=profileEntries();
-  else if(histFilter==="increase") rows=setEntries().filter(e=>e.decision==="increase");
-  else if(histFilter==="complete") rows=completedEntries();
-  else if(histFilter!=="all") rows=entries.filter(e=>e.day===histFilter && e.profile===currentProfileKey);
-  qs("hist-empty").style.display=rows.length?"none":"block";
-  qs("hist-body").innerHTML=rows.map(e=>`<tr><td class="mono">${e.date}</td><td>${profileByKey(e.profile).name}</td><td>${e.day}</td><td>${e.ex===COMPLETE_EX?"Workout complete":e.ex}</td><td class="mono">${e.load??"—"}</td><td class="mono">${e.s1||"—"}</td><td class="mono">${e.s2||"—"}</td><td class="mono">${e.rir??"—"}</td><td><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></td><td><button class="btn ghost small" onclick="deleteEntry('${e.id}')">Del</button></td></tr>`).join("");
-  qs("hist-cards").innerHTML=rows.map(e=>`<div class="history-card"><div class="top"><div><h3>${e.ex===COMPLETE_EX?"Workout complete":e.ex}</h3><div class="line">${profileByKey(e.profile).name} · ${e.date} · ${e.day} · ${e.load??"—"}${e.load!=null?" kg":""} · reps ${e.s1||"—"}${e.s2?"/"+e.s2:""}</div><div class="line">${e.notes||""}</div></div><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></div><div class="btnrow" style="margin-top:10px"><button class="btn ghost" onclick="deleteEntry('${e.id}')">Delete</button></div></div>`).join("");
-}
-function renderSchedule(){
-  qs("schedule-title").textContent=`${activeProfile().name} schedule`;
-  qs("schedule-expected").textContent=`${activeSettings().expected_sessions_per_week} / week`;
-  qs("schedule-grid").innerHTML=activeSchedule().map(d=>`<div class="day-card"><div class="day-head"><div class="circle">${String(d.day).replace("Day ","")}</div><div><h3>${d.title}</h3><p>${d.focus||d.type}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${e[0]}</span><span>${e[1]} × ${e[2]}</span></div>`).join("")}</div>`).join("");
-}
-function renderSettings(){
-  qs("settings-profile").textContent=activeProfile().name;
-  const u=usageEstimate();
-  qs("usage-mb").textContent=u.mb.toFixed(2)+" MB";
-  qs("usage-rows").textContent=u.rows;
-  qs("usage-sub").textContent=`${u.pct.toFixed(2)}% of estimated free DB limit`;
-  qs("usage-detail").className="warnbox "+u.level;
-  qs("usage-detail").innerHTML=`<b>Usage estimate:</b> ${u.msg}<div class="bar"><span style="width:${u.pct}%"></span></div><br>Rows: ${u.rows}. Estimated size: ${u.mb.toFixed(2)} MB / 500 MB. This is a conservative estimate; exact database size requires Supabase dashboard access.`;
-  fillProfileSelects();
-  qs("edit-profile").value=editorProfileKey;
-  qs("edit-profile-tag").textContent=profileByKey(editorProfileKey).name;
-}
-function loadEditorForProfile(key){
-  editorProfileKey=key;
-  const st=activeSettings(key); qs("edit-expected").value=st.expected_sessions_per_week;
-  qs("edit-profile-tag").textContent=profileByKey(key).name;
-  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label>Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}"></div><div class="field"><label>Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}"></div></div><div class="field" style="margin-top:10px"><label>Exercises — one per line: name | sets | reps | note</label><textarea id="ed-exs-${idx}">${(d.exs||[]).map(e=>e.join(" | ")).join("\n")}</textarea></div></div>`).join("");
-}
-function escapeAttr(s){return String(s||"").replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("<","&lt;")}
-function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||""]})}
-async function saveEditedSchedule(){
-  const base=activeSettings(editorProfileKey); const sched=(base.schedule_json||[]).map((d,idx)=>({...d,title:qs(`ed-title-${idx}`).value.trim()||d.title,focus:qs(`ed-focus-${idx}`).value.trim()||d.focus,exs:parseExerciseLines(qs(`ed-exs-${idx}`).value)}));
-  const row={user_id:user.id,profile_key:editorProfileKey,display_name:profileByKey(editorProfileKey).name,expected_sessions_per_week:Number(qs("edit-expected").value)||0,schedule_json:sched};
-  const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});
-  if(error){alert(error.message);return}
-  toast("Schedule saved"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
-}
-async function resetEditedSchedule(){
-  if(!confirm("Reset this profile schedule to its default?")) return;
-  const p=profileByKey(editorProfileKey); const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
-  const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});
-  if(error){alert(error.message);return}
-  toast("Schedule reset"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
-}
-function exportBackup(){
-  const data={exported_at:new Date().toISOString(),profiles:profileSettings,entries};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="divinity-backup.json"; a.click(); URL.revokeObjectURL(url);
-}
-
-function loadGoals(){return JSON.parse(localStorage.getItem("divinity-goals")||"[]")}
-function saveGoals(goals){localStorage.setItem("divinity-goals",JSON.stringify(goals))}
-function loadGoalChecks(){return JSON.parse(localStorage.getItem("divinity-goal-checks")||"{}")}
-function saveGoalChecks(checks){localStorage.setItem("divinity-goal-checks",JSON.stringify(checks))}
-function todayKey(){return new Date().toISOString().slice(0,10)}
-function addGoal(){const text=qs("goal-text").value.trim(); if(!text){toast("Enter a goal name");return} const goals=loadGoals(); goals.push({id:Date.now().toString(),text}); saveGoals(goals); qs("goal-text").value=""; renderGoals(); toast("Goal added")}
-function removeGoal(id){const goals=loadGoals().filter(g=>g.id!==id); saveGoals(goals); const checks=loadGoalChecks(); const today=todayKey(); if(checks[today]){delete checks[today][id]; saveGoalChecks(checks)} renderGoals();}
-function toggleGoalDone(id){const checks=loadGoalChecks(); const today=todayKey(); checks[today]=checks[today]||{}; checks[today][id]=!checks[today][id]; saveGoalChecks(checks); renderGoals();}
-function renderGoals(){const goals=loadGoals(); const checks=loadGoalChecks(); const today=todayKey(); const todayChecks=checks[today]||{}; if(goals.length){qs("goal-list").innerHTML=goals.map(g=>`<div class="day-goal-row"><label style="flex:1"><strong>${g.text}</strong></label><button class="btn ghost small" onclick="removeGoal('${g.id}')">Remove</button></div>`).join(""); qs("goal-day-list").innerHTML=goals.map(g=>`<div class="day-goal-row"><label><input type="checkbox" ${todayChecks[g.id]?'checked':''} onchange="toggleGoalDone('${g.id}')"> <span class="goal-label">${g.text}</span></label></div>`).join(""); qs("goals-summary").innerHTML=`<div class="warnbox ok"><strong>Today's goals:</strong> ${goals.filter(g=>todayChecks[g.id]).length} of ${goals.length} done.</div>`;} else {qs("goal-list").innerHTML='<div class="empty"><h3>No goals yet</h3><p>Create a daily goal above.</p></div>'; qs("goal-day-list").innerHTML='<div class="empty"><h3>No goals yet</h3><p>Add one to start tracking your daily habits.</p></div>'; qs("goals-summary").innerHTML='';}}
-
-function renderAll(){
-  if(!user) return;
-  renderProfilePicker(); fillProfileSelects(); fillDaySelect(); renderDashboard(); renderLoads(); renderGoals(); renderHistory(); renderSchedule(); renderSettings(); if(qs("schedule-editor").innerHTML==="") loadEditorForProfile(editorProfileKey);
-}
-
-supabaseClient.auth.onAuthStateChange((event, session)=>{ if(event==="SIGNED_IN") checkAuth(); });
-checkAuth();
-</script>
+<script src="./app.js" defer></script>
 </body>
 </html>
