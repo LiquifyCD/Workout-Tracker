@@ -28,6 +28,13 @@ function activeSettings(key=currentProfileKey){return profileSettings[key] || {.
 function activeSchedule(key=currentProfileKey){return activeSettings(key).schedule_json || profileByKey(key).defaultSchedule}
 function toast(msg){const t=qs("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}
 function setSync(status,msg){const d=qs("sync-dot"), s=qs("sync-text"); d.className="dot "+(status||""); s.textContent=msg;}
+function reportError(context,error){
+  console.error(context,error);
+  setSync("bad","Error");
+  alert(`${context}: ${error?.message||error}`);
+}
+function queryData(result,context){if(result.error)throw new Error(`${context}: ${result.error.message}`);return result.data||[]}
+function setEmptyState(id,hasRows){qs(id).style.display=hasRows?"none":"block"}
 function setActiveButtons(page){document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===page))}
 function renderNavigation(){
   qs("desktop-nav").innerHTML=NAV_ITEMS.map(item=>`<button class="${item.page==="dashboard"?"active":""}" data-page="${item.page}">${item.desktop}</button>`).join("");
@@ -51,8 +58,8 @@ async function resetPassword(){
   const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
   qs("auth-msg").textContent=error?error.message:"Password reset email sent.";
 }
-async function signOut(){await supabaseClient.auth.signOut();location.reload()}
-async function getUser(){const {data}=await supabaseClient.auth.getUser();return data.user}
+async function signOut(){const {error}=await supabaseClient.auth.signOut();if(error){reportError("Could not sign out",error);return}location.reload()}
+async function getUser(){const {data,error}=await supabaseClient.auth.getUser();if(error?.name==="AuthSessionMissingError")return null;if(error){reportError("Could not check authentication",error);return null}return data.user}
 async function checkAuth(){
   setSync("", "Checking");
   user=await getUser();
@@ -70,27 +77,29 @@ async function ensureProfileSettings(){
   for(const p of PROFILES){
     if(profileSettings[p.key]) continue;
     const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
-    const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});
-    if(error) throw error;
+    await upsertProfileSettings(row);
     profileSettings[p.key]={...p,...row};
   }
 }
 
 async function loadAllData(show=true){
-  if(show) setSync("", "Loading");
-  user = user || await getUser();
-  if(!user){entries=[];renderAll();return}
-  const s = await supabaseClient.from("profile_settings").select("*").eq("user_id",user.id);
-  if(s.error){setSync("bad","SQL needed");alert("Run the new SQL migration first. Missing profile_settings or policy.\n\n"+s.error.message);return}
-  profileSettings={};
-  (s.data||[]).forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r}});
-  await ensureProfileSettings();
-  const e = await supabaseClient.from("workout_entries").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
-  if(e.error){setSync("bad","SQL needed");alert("Run the SQL migration first. Missing profile_key or policy.\n\n"+e.error.message);return}
-  entries=(e.data||[]).map(r=>({id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,title:r.workout_title,ex:r.exercise,load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,created:r.created_at}));
-  setSync("ok","Synced");
-  renderAll();
+  try{
+    if(show)setSync("","Loading");
+    user=user||await getUser();
+    if(!user){entries=[];renderAll();return}
+    const settingsRows=queryData(await supabaseClient.from("profile_settings").select("*").eq("user_id",user.id),"Could not load profile settings");
+    profileSettings={};
+    settingsRows.forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r}});
+    await ensureProfileSettings();
+    const entryRows=queryData(await supabaseClient.from("workout_entries").select("*").eq("user_id",user.id).order("created_at",{ascending:false}),"Could not load workout entries");
+    entries=entryRows.map(mapWorkoutEntry);
+    setSync("ok","Synced");
+    renderAll();
+  }catch(error){reportError("Sync failed",error)}
 }
+
+function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,title:r.workout_title,ex:r.exercise,load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,created:r.created_at}}
+async function upsertProfileSettings(row){const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});if(error)throw error}
 
 function switchProfile(key, close=false){
   currentProfileKey=key;localStorage.setItem("divinity-profile",key);
@@ -102,10 +111,14 @@ function profileEntries(key=currentProfileKey){return entries.filter(e=>e.profil
 function completedEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex===COMPLETE_EX&&!e.isRest)}
 function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest)}
 function scheduleByDay(day,key=currentProfileKey){return activeSchedule(key).find(x=>x.day===day)||activeSchedule(key)[0]}
+// Completion rows are already newest-first, so advancing follows the configured
+// schedule order instead of assuming that day labels contain consecutive numbers.
 function nextDayIndex(key=currentProfileKey){const schedule=activeSchedule(key);const c=completedEntries(key)[0];if(!c)return 0;const idx=schedule.findIndex(d=>d.day===c.day);return idx<0?0:(idx+1)%schedule.length}
 function latestSetFor(ex,key=currentProfileKey){return setEntries(key).find(e=>e.ex===ex)}
 function decisionClass(d){return d==="increase"?"increase":d==="reduce"?"reduce":d==="rest"?"rest":d==="complete"?"complete":"repeat"}
 
+// Double progression: reps below the range reduce load; reaching the top with
+// low RIR increases it; all other valid outcomes repeat or flag recovery.
 function decide(s1,s2,rir,range){
   const [min,max]=range.split("-").map(Number); const sets=s2>0?[s1,s2]:[s1];
   if(sets.some(r=>r<min)) return {decision:"reduce",label:"Repeat or reduce",reason:"A set fell below the target range.",cls:"reduce"};
@@ -133,6 +146,8 @@ function fillDaySelect(){
   qs("log-day").value=sched[nextDayIndex(currentProfileKey)].day;
   fillExercisesForDay();
 }
+// Only sets newer than this day's latest completion belong to the current loop.
+// This prevents an old workout from shifting the first exercise of a new loop.
 function dayEntries(day,key=currentProfileKey){const completion=completedEntries(key).find(e=>e.day===day);return setEntries(key).filter(e=>e.day===day&&(!completion||e.created>completion.created))}
 function lastLoggedExerciseForDay(day,key=currentProfileKey){const dayLog=dayEntries(day,key);return dayLog.length?dayLog[0].ex:null}
 function nextExerciseForDay(day,key=currentProfileKey){const d=scheduleByDay(day,key);const last=lastLoggedExerciseForDay(day,key);if(!last) return d.exs[0][0];const idx=d.exs.findIndex(e=>e[0]===last);return d.exs[(idx+1+d.exs.length)%d.exs.length][0]}
@@ -160,7 +175,7 @@ async function insertRow(row){
   if(!user){qs("auth").classList.add("show");toast("Sign in first");return false}
   setSync("", "Saving");
   const {error}=await supabaseClient.from("workout_entries").insert({...row,user_id:user.id,profile_key:currentProfileKey,profile_name:activeProfile().name});
-  if(error){setSync("bad","Error");alert(error.message);return false}
+  if(error){reportError("Could not save workout entry",error);return false}
   setSync("ok","Synced"); await loadAllData(false); return true;
 }
 async function addEntry(){
@@ -188,8 +203,8 @@ async function logRestDay(){
   const ok=await insertRow({entry_date:new Date().toISOString().slice(0,10),loop_day:n.day,workout_title:"Rest day",exercise:"Rest day",decision:"rest",notes:"Recovery day",is_rest_day:true});
   if(ok) toast("Rest day logged");
 }
-async function deleteEntry(id){ if(!confirm("Delete this entry?"))return; const {error}=await supabaseClient.from("workout_entries").delete().eq("id",id); if(error){alert(error.message);return} await loadAllData(false); toast("Deleted") }
-async function clearProfileData(){ if(!confirm(`Delete ALL data for ${activeProfile().name}?`))return; const {error}=await supabaseClient.from("workout_entries").delete().eq("user_id",user.id).eq("profile_key",currentProfileKey); if(error){alert(error.message);return} await loadAllData(false); toast("Profile data deleted") }
+async function deleteEntry(id){ if(!confirm("Delete this entry?"))return; const {error}=await supabaseClient.from("workout_entries").delete().eq("id",id); if(error){reportError("Could not delete workout entry",error);return} await loadAllData(false); toast("Deleted") }
+async function clearProfileData(){ if(!confirm(`Delete ALL data for ${activeProfile().name}?`))return; const {error}=await supabaseClient.from("workout_entries").delete().eq("user_id",user.id).eq("profile_key",currentProfileKey); if(error){reportError("Could not delete profile data",error);return} await loadAllData(false); toast("Profile data deleted") }
 
 function usageEstimate(){
   const rows=entries.length+Object.keys(profileSettings).length;
@@ -214,13 +229,13 @@ function renderDashboard(){
   qs("usage-alert").className="warnbox "+u.level;
   qs("usage-alert").innerHTML=`<b>Storage alert:</b> ${u.msg} Estimated database use: ${u.mb.toFixed(2)} MB / 500 MB.`;
   qs("next-card").innerHTML=`<div class="workout-head"><div><div class="workout-title">${n.title}</div><div class="workout-sub">${activeProfile().name} · ${n.focus}. Complete this workout to advance this profile's loop.</div></div><div class="btnrow"><button class="btn primary" data-page="log">Log set</button><button class="btn" data-action="complete-dashboard-workout">Complete</button><button class="btn ghost" data-action="log-rest-day">Rest</button></div></div><div class="tablewrap"><table><thead><tr><th>Exercise</th><th>Sets</th><th>Target</th><th>Last load</th><th>Decision</th></tr></thead><tbody>${n.exs.map(e=>{const last=latestSetFor(e[0]);return `<tr><td><div class="exname">${e[0]}</div><div class="meta">${e[3]||""}</div></td><td class="mono">${e[1]}</td><td class="mono">${e[2]}</td><td class="mono">${last&&last.load!=null?last.load+" kg":"—"}</td><td>${last?`<span class="badge ${decisionClass(last.decision)}">${last.decision}</span>`:'<span class="meta">—</span>'}</td></tr>`}).join("")}</tbody></table></div>`;
-  const recent=setEntries().slice(0,8); qs("recent-empty").style.display=recent.length?"none":"block"; qs("recent-body").innerHTML=recent.map(rowHtml).join("");
+  const recent=setEntries().slice(0,8); setEmptyState("recent-empty",recent.length>0); qs("recent-body").innerHTML=recent.map(rowHtml).join("");
   qs("log-profile-tag").textContent=activeProfile().name;
 }
 function rowHtml(e){return `<tr><td class="mono">${e.date}</td><td>${profileByKey(e.profile).name}</td><td><span class="tag">${e.day}</span></td><td>${e.ex}</td><td class="mono">${e.load??"—"}${e.load!=null?" kg":""}</td><td class="mono">${e.s1}${e.s2?"/"+e.s2:""}</td><td><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></td></tr>`}
 function renderLoads(){
   const map={}; setEntries().forEach(e=>{if(!map[e.ex])map[e.ex]=e});
-  const rows=Object.values(map); qs("loads-empty").style.display=rows.length?"none":"block";
+  const rows=Object.values(map); setEmptyState("loads-empty",rows.length>0);
   qs("loads-body").innerHTML=rows.map(e=>`<tr><td>${e.ex}</td><td class="mono">${e.load} kg</td><td class="mono">${e.s1}${e.s2?"/"+e.s2:""}</td><td class="mono">${e.range}</td><td><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></td></tr>`).join("");
 }
 function buildFilters(){const fs=["all","current","Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","increase","complete"]; qs("filters").innerHTML=fs.map(f=>`<button class="${histFilter===f?'active':''}" data-filter="${f}">${f}</button>`).join("")}
@@ -230,7 +245,7 @@ function renderHistory(){
   else if(histFilter==="increase") rows=setEntries().filter(e=>e.decision==="increase");
   else if(histFilter==="complete") rows=completedEntries();
   else if(histFilter!=="all") rows=entries.filter(e=>e.day===histFilter && e.profile===currentProfileKey);
-  qs("hist-empty").style.display=rows.length?"none":"block";
+  setEmptyState("hist-empty",rows.length>0);
   qs("hist-body").innerHTML=rows.map(e=>`<tr><td class="mono">${e.date}</td><td>${profileByKey(e.profile).name}</td><td>${e.day}</td><td>${e.ex===COMPLETE_EX?"Workout complete":e.ex}</td><td class="mono">${e.load??"—"}</td><td class="mono">${e.s1||"—"}</td><td class="mono">${e.s2||"—"}</td><td class="mono">${e.rir??"—"}</td><td><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></td><td><button class="btn ghost small" data-delete-id="${e.id}">Del</button></td></tr>`).join("");
   qs("hist-cards").innerHTML=rows.map(e=>`<div class="history-card"><div class="top"><div><h3>${e.ex===COMPLETE_EX?"Workout complete":e.ex}</h3><div class="line">${profileByKey(e.profile).name} · ${e.date} · ${e.day} · ${e.load??"—"}${e.load!=null?" kg":""} · reps ${e.s1||"—"}${e.s2?"/"+e.s2:""}</div><div class="line">${e.notes||""}</div></div><span class="badge ${decisionClass(e.decision)}">${e.decision}</span></div><div class="btnrow" style="margin-top:10px"><button class="btn ghost" data-delete-id="${e.id}">Delete</button></div></div>`).join("");
 }
@@ -260,18 +275,20 @@ function loadEditorForProfile(key){
 function escapeAttr(s){return String(s||"").replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("<","&lt;")}
 function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||""]})}
 async function saveEditedSchedule(){
-  const base=activeSettings(editorProfileKey); const sched=(base.schedule_json||[]).map((d,idx)=>({...d,title:qs(`ed-title-${idx}`).value.trim()||d.title,focus:qs(`ed-focus-${idx}`).value.trim()||d.focus,exs:parseExerciseLines(qs(`ed-exs-${idx}`).value)}));
-  const row={user_id:user.id,profile_key:editorProfileKey,display_name:profileByKey(editorProfileKey).name,expected_sessions_per_week:Number(qs("edit-expected").value)||0,schedule_json:sched};
-  const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});
-  if(error){alert(error.message);return}
-  toast("Schedule saved"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
+  try{
+    const base=activeSettings(editorProfileKey); const sched=(base.schedule_json||[]).map((d,idx)=>({...d,title:qs(`ed-title-${idx}`).value.trim()||d.title,focus:qs(`ed-focus-${idx}`).value.trim()||d.focus,exs:parseExerciseLines(qs(`ed-exs-${idx}`).value)}));
+    const row={user_id:user.id,profile_key:editorProfileKey,display_name:profileByKey(editorProfileKey).name,expected_sessions_per_week:Number(qs("edit-expected").value)||0,schedule_json:sched};
+    await upsertProfileSettings(row);
+    toast("Schedule saved"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
+  }catch(error){reportError("Could not save schedule",error)}
 }
 async function resetEditedSchedule(){
   if(!confirm("Reset this profile schedule to its default?")) return;
-  const p=profileByKey(editorProfileKey); const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
-  const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});
-  if(error){alert(error.message);return}
-  toast("Schedule reset"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
+  try{
+    const p=profileByKey(editorProfileKey); const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
+    await upsertProfileSettings(row);
+    toast("Schedule reset"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
+  }catch(error){reportError("Could not reset schedule",error)}
 }
 function exportBackup(){
   const data={exported_at:new Date().toISOString(),profiles:profileSettings,entries};
@@ -307,14 +324,16 @@ const ACTIONS = {
 };
 
 async function handleClick(event){
-  const button=event.target.closest("button");
-  if(!button)return;
-  if(button.dataset.page){showPage(button.dataset.page);return}
-  if(button.dataset.profile){switchProfile(button.dataset.profile,true);return}
-  if(button.dataset.filter){histFilter=button.dataset.filter;renderHistory();return}
-  if(button.dataset.deleteId){await deleteEntry(button.dataset.deleteId);return}
-  const action=ACTIONS[button.dataset.action];
-  if(action)await action();
+  try{
+    const button=event.target.closest("button");
+    if(!button)return;
+    if(button.dataset.page){showPage(button.dataset.page);return}
+    if(button.dataset.profile){switchProfile(button.dataset.profile,true);return}
+    if(button.dataset.filter){histFilter=button.dataset.filter;renderHistory();return}
+    if(button.dataset.deleteId){await deleteEntry(button.dataset.deleteId);return}
+    const action=ACTIONS[button.dataset.action];
+    if(action)await action();
+  }catch(error){reportError("Action failed",error)}
 }
 
 function bindEvents(){
@@ -328,6 +347,6 @@ function bindEvents(){
 
 renderNavigation();
 bindEvents();
-supabaseClient.auth.onAuthStateChange((event, session)=>{ if(event==="SIGNED_IN") checkAuth(); });
-checkAuth();
+supabaseClient.auth.onAuthStateChange(event=>{if(event==="SIGNED_IN")checkAuth().catch(error=>reportError("Sign-in failed",error))});
+checkAuth().catch(error=>reportError("Startup failed",error));
 })();
