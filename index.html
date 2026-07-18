@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050507">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>Divinity — Training Tracker</title>
 
   <link rel="icon" href="./favicon.ico" sizes="any">
@@ -69,6 +69,17 @@
 
       <div id="usage-alert" class="warnbox ok" style="display:none;margin-bottom:12px"></div>
 
+      <div class="section"><h2>Daily check-in</h2><span class="tag" id="checkin-date">Today</span></div>
+      <div class="card pad">
+        <div class="formgrid four">
+          <div class="field"><label for="checkin-weight">Body weight kg</label><input id="checkin-weight" type="number" min="20" max="400" step="0.1"></div>
+          <div class="field"><label for="checkin-sleep">Sleep hours</label><input id="checkin-sleep" type="number" min="0" max="24" step="0.25"></div>
+          <div class="field"><label for="checkin-readiness">Readiness</label><select id="checkin-readiness"><option value="">Not set</option><option value="1">1 — very low</option><option value="2">2 — low</option><option value="3">3 — normal</option><option value="4">4 — good</option><option value="5">5 — excellent</option></select></div>
+          <div class="field"><label for="checkin-pain">Pain / notes</label><input id="checkin-pain" type="text" maxlength="1000" placeholder="Optional"></div>
+        </div>
+        <div class="btnrow" style="margin-top:12px"><button class="btn primary" data-action="save-checkin">Save check-in</button></div>
+      </div>
+
       <div class="section"><h2>Next workout</h2><span class="tag purple" id="next-tag">Day 1</span></div>
       <div class="card" id="next-card"></div>
 
@@ -91,23 +102,32 @@
           <div class="field"><label>RIR</label><input id="log-rir" type="number" min="0" max="5" placeholder="1"></div>
         </div>
         <div class="formgrid" style="margin-top:12px">
+          <div class="field"><label for="log-set-type">Set type</label><select id="log-set-type"><option value="work">Work set</option><option value="warmup">Warm-up</option></select></div>
           <div class="field"><label>Rep target</label><select id="log-range"><option value="4-7">4–7 stable compounds</option><option value="6-10">6–10 isolations</option><option value="8-15">8–15 raises</option><option value="6-12">6–12 calves</option></select></div>
-          <div class="field"><label>Notes</label><input id="log-notes" type="text" placeholder="Form clean, slight fatigue..."></div>
         </div>
+        <div class="field" style="margin-top:12px"><label>Notes</label><input id="log-notes" type="text" placeholder="Form clean, slight fatigue..."></div>
         <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="add-entry">Save set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button></div>
         <div id="log-preview" style="margin-top:16px"></div>
         <div id="decision" class="decision"><h3>Next decision</h3><div id="decision-main"></div><p id="decision-reason"></p></div>
       </div>
+      <div class="section"><h2>Rest timer</h2><span class="timer" id="timer-display" aria-live="polite">00:00</span></div>
+      <div class="card pad btnrow"><button class="btn" data-timer="60">1:00</button><button class="btn" data-timer="90">1:30</button><button class="btn" data-timer="120">2:00</button><button class="btn ghost" data-action="stop-timer">Stop</button></div>
       <div class="section"><h2>Current loads</h2></div>
       <div class="card tablewrap"><table><thead><tr><th>Exercise</th><th>Load</th><th>Last reps</th><th>Target</th><th>Decision</th></tr></thead><tbody id="loads-body"></tbody></table><div id="loads-empty" class="empty"><h3>No current loads</h3><p>Save sets to build this list.</p></div></div>
     </section>
 
     <section id="page-history" class="page">
-      <div class="section"><h2>History</h2><button class="btn bad" data-action="clear-profile-data">Delete profile data</button></div>
+      <div class="section"><h2>History</h2><button class="btn bad" data-action="clear-profile-data">Move profile data to trash</button></div>
+      <div class="card pad">
+        <div class="formgrid"><div class="field"><label for="progress-exercise">Progress exercise</label><select id="progress-exercise"></select></div><div class="stat compact"><div class="label">Personal record</div><div class="value" id="progress-pr">—</div><div class="sub" id="progress-pr-date"></div></div></div>
+        <svg id="progress-chart" class="chart" viewBox="0 0 600 180" role="img" aria-label="Load progression chart"></svg>
+      </div>
       <div class="filters" id="filters"></div>
       <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>S1</th><th>S2</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
       <div class="stack" id="hist-cards"></div>
       <div class="section history-pagination"><button id="history-prev" class="btn ghost" data-action="history-prev">Previous</button><span id="history-page" class="meta" aria-live="polite"></span><button id="history-next" class="btn ghost" data-action="history-next">Next</button></div>
+      <div class="section"><h2>Trash</h2><span class="tag" id="trash-count">0</span></div>
+      <div id="trash-list" class="stack"></div>
     </section>
 
     <section id="page-schedule" class="page">
@@ -120,7 +140,7 @@
       <div class="grid3">
         <div class="stat"><div class="label">Selected profile</div><div class="value" id="settings-profile">Alfred</div><div class="sub"><button class="btn small ghost" data-action="show-profile-picker">Switch profile</button></div></div>
         <div class="stat"><div class="label">Estimated DB use</div><div class="value" id="usage-mb">0 MB</div><div class="sub" id="usage-sub">safe</div></div>
-        <div class="stat"><div class="label">Rows</div><div class="value" id="usage-rows">0</div><div class="sub">logs + settings</div></div>
+        <div class="stat"><div class="label">Rows</div><div class="value" id="usage-rows">0</div><div class="sub">logs + check-ins + settings</div></div>
       </div>
       <div class="card pad">
         <div class="section" style="margin-top:0"><h2>Edit profile schedule</h2><span class="tag" id="edit-profile-tag">Profile</span></div>
@@ -129,7 +149,8 @@
           <div class="field"><label>Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>
         </div>
         <div id="schedule-editor" class="stack" style="margin-top:12px"></div>
-        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="save-schedule">Save schedule</button><button class="btn ghost" data-action="reset-schedule">Reset selected default</button><button class="btn" data-action="export-backup">Export backup</button></div>
+        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="save-schedule">Save schedule</button><button class="btn ghost" data-action="reset-schedule">Reset selected default</button><button class="btn" data-action="export-backup">Export backup</button><button class="btn" data-action="choose-import">Import backup</button><button id="install-app" class="btn" data-action="install-app" hidden>Install app</button></div>
+        <input id="import-file" type="file" accept="application/json,.json" hidden>
       </div>
       <div class="warnbox" style="margin-top:12px">
         <b>Storage alert:</b> the public site cannot read exact Supabase database size without a secret admin key. Divinity estimates usage from row counts and warns long before the free 500 MB database limit.
@@ -141,7 +162,11 @@
   <nav id="mobile-nav" class="bottomnav" aria-label="Mobile navigation"></nav>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="connection-banner" class="status-banner" role="status" hidden>You are offline. Saved data remains visible; syncing resumes online.</div>
+  <div id="update-banner" class="status-banner update" role="status" hidden>New version available. <button class="btn small primary" data-action="apply-update">Update now</button></div>
+  <div id="undo-bar" class="status-banner update" role="status" hidden>Entry moved to trash. <button class="btn small" data-action="undo-delete">Undo</button></div>
 
+<script src="./data/programs.js" defer></script>
 <script src="./core.js" defer></script>
 <script src="./app.js" defer></script>
 </body>

@@ -45,5 +45,44 @@
     return `${year}-${month}-${day}`;
   }
 
-  return { decide, escapeAttr: escapeHtml, escapeHtml, localDateKey, normalizeRange, rangeMidpoint };
+  function slugifyExercise(name) {
+    return String(name || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "exercise";
+  }
+
+  function exerciseIdentity(exercise) {
+    return String(exercise?.[4] || slugifyExercise(exercise?.[0]));
+  }
+
+  function personalRecord(entries, exerciseId) {
+    return entries
+      .filter(entry => entry.exerciseId === exerciseId && entry.setType !== "warmup" && entry.load != null)
+      .reduce((best, entry) => !best || entry.load > best.load ? entry : best, null);
+  }
+
+  function progressSeries(entries, exerciseId, limit = 20) {
+    return entries
+      .filter(entry => entry.exerciseId === exerciseId && entry.setType !== "warmup" && entry.load != null)
+      .slice()
+      .sort((a, b) => String(a.created).localeCompare(String(b.created)))
+      .slice(-limit);
+  }
+
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function validateBackup(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Backup must be a JSON object.");
+    if (value.entries != null && !Array.isArray(value.entries)) throw new Error("Backup entries must be an array.");
+    if (value.profiles != null && (typeof value.profiles !== "object" || Array.isArray(value.profiles))) throw new Error("Backup profiles must be an object.");
+    if (value.checkins != null && !Array.isArray(value.checkins)) throw new Error("Backup check-ins must be an array.");
+    return value;
+  }
+
+  return { decide, escapeAttr: escapeHtml, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup };
 });

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "check": "node --check core.js && node --check app.js",
+    "check": "node --check data/programs.js && node --check core.js && node --check app.js && node --check sw.js",
     "test": "npm run check && html-validate index.html && node --test"
   },
   "devDependencies": {
