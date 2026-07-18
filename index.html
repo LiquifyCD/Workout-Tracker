@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#050507" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#050507">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>Divinity — Training Tracker</title>
 
   <link rel="icon" href="./favicon.ico" sizes="any">
@@ -12,25 +13,37 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
   <link rel="manifest" href="./site.webmanifest">
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7" integrity="sha384-BmlQlKlDvXvKoxkn5OQuUo/aJQCTXeB+Kls6EccBmG4Kf8AXvp89RtO9MtPxP/r5" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div id="auth" class="auth">
+  <div id="auth" class="auth" role="dialog" aria-modal="true" aria-labelledby="auth-title">
     <div class="auth-card">
       <div class="sigil" style="margin-bottom:16px"></div>
-      <h1>Divinity</h1>
-      <div class="field"><label>Email</label><input id="login-email" type="email" autocomplete="email" placeholder="shared@email.com"></div>
-      <div class="field" style="margin-top:10px"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Shared site password"></div>
+      <h1 id="auth-title">Divinity</h1>
+      <div class="field"><label for="login-email">Email</label><input id="login-email" type="email" autocomplete="email" placeholder="shared@email.com"></div>
+      <div class="field" style="margin-top:10px"><label for="login-password">Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Shared site password"></div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" data-action="sign-in">Login</button><button class="btn ghost" data-action="reset-password">Reset</button></div>
       <p id="auth-msg" class="small"></p>
     </div>
   </div>
 
-  <div id="profile-screen" class="profile-screen">
+  <div id="password-recovery" class="auth" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+    <div class="auth-card">
+      <div class="sigil" style="margin-bottom:16px"></div>
+      <h1 id="recovery-title">New password</h1>
+      <p>Choose a new password for your account.</p>
+      <div class="field"><label for="recovery-password">New password</label><input id="recovery-password" type="password" minlength="8" autocomplete="new-password"></div>
+      <div class="field" style="margin-top:10px"><label for="recovery-confirm">Confirm password</label><input id="recovery-confirm" type="password" minlength="8" autocomplete="new-password"></div>
+      <div class="btnrow" style="margin-top:12px"><button class="btn primary" data-action="update-password">Update password</button></div>
+      <p id="recovery-msg" class="small" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div id="profile-screen" class="profile-screen" role="dialog" aria-modal="true" aria-labelledby="profile-title">
     <div class="profile-card">
       <div class="sigil" style="margin-bottom:16px"></div>
-      <h1>Choose profile</h1>
+      <h1 id="profile-title">Choose profile</h1>
       <div id="profile-grid" class="profile-grid"></div>
       <div class="btnrow" style="margin-top:14px"><button class="btn ghost" data-action="hide-profile-picker">Keep current</button><button class="btn bad" data-action="sign-out">Logout</button></div>
     </div>
@@ -38,13 +51,13 @@
 
   <header class="topbar">
     <div class="brand"><div class="sigil"></div><div><h1>Divinity</h1><p id="brand-sub">Group training tracker</p></div></div>
-    <nav id="desktop-nav" class="nav"></nav>
+    <nav id="desktop-nav" class="nav" aria-label="Primary navigation"></nav>
     <div class="account-actions">
       <button class="mini-btn" id="active-profile-btn" data-action="show-profile-picker">Profile</button>
-      
+
       <button class="mini-btn danger" data-action="sign-out">Logout</button>
     </div>
-    <div class="sync"><span id="sync-dot" class="dot"></span><span id="sync-text">Loading</span></div>
+    <div class="sync" aria-live="polite"><span id="sync-dot" class="dot"></span><span id="sync-text">Loading</span></div>
   </header>
 
   <main class="app">
@@ -94,6 +107,7 @@
       <div class="filters" id="filters"></div>
       <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>S1</th><th>S2</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
       <div class="stack" id="hist-cards"></div>
+      <div class="section history-pagination"><button id="history-prev" class="btn ghost" data-action="history-prev">Previous</button><span id="history-page" class="meta" aria-live="polite"></span><button id="history-next" class="btn ghost" data-action="history-next">Next</button></div>
     </section>
 
     <section id="page-schedule" class="page">
@@ -124,10 +138,11 @@
     </section>
   </main>
 
-  <nav id="mobile-nav" class="bottomnav"></nav>
+  <nav id="mobile-nav" class="bottomnav" aria-label="Mobile navigation"></nav>
 
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="./core.js" defer></script>
 <script src="./app.js" defer></script>
 </body>
 </html>
