@@ -18,6 +18,13 @@
 </head>
 <body>
   <div id="auth" class="auth" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="login-media" aria-hidden="true">
+      <img class="login-poster" src="./media/login-poster.jpg" alt="">
+      <video id="login-video" class="login-video" muted loop playsinline preload="metadata" poster="./media/login-poster.jpg">
+        <source src="./media/login-background.mp4" type="video/mp4">
+      </video>
+      <div class="login-shade"></div>
+    </div>
     <div class="auth-card">
       <div class="sigil" style="margin-bottom:16px"></div>
       <h1 id="auth-title">Divinity</h1>

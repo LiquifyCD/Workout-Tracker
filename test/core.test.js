@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { decide, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup } = require("../core.js");
+const { decide, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup } = require("../core.js");
 
 test("escapes stored HTML before rendering", () => {
   assert.equal(escapeHtml(`<img src=x onerror="alert(1)">'`), "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&#39;");
@@ -43,4 +43,12 @@ test("validates backup shape and UUIDs", () => {
   assert.throws(() => validateBackup({ entries: {} }), /entries/);
   assert.equal(isUuid("4d6f03a9-01ad-4f52-8c0d-12ca6f531976"), true);
   assert.equal(isUuid("not-an-id"), false);
+});
+
+test("normalizes and validates edited schedules before persistence", () => {
+  const schedule = normalizeSchedule([{ day: " Push ", type: "Upper", title: " Push day ", focus: "Chest", exs: [["Incline press", "2", "6–10", "", "incline-press", ["Press"]]] }]);
+  assert.equal(schedule[0].day, "Push");
+  assert.equal(schedule[0].exs[0][2], "6-10");
+  assert.throws(() => normalizeSchedule([{...schedule[0]}, {...schedule[0]}]), /duplicated/);
+  assert.throws(() => normalizeSchedule([{...schedule[0], exs: []}]), /at least one exercise/);
 });

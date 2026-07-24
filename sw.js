@@ -1,11 +1,11 @@
 "use strict";
 
-const CACHE = "divinity-v2";
+const CACHE = "divinity-v3";
 const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./data/programs.js", "./core.js", "./app.js",
   "./site.webmanifest", "./android-chrome-192x192.png", "./android-chrome-512x512.png",
-  "./apple-touch-icon.png", "./favicon.ico", SUPABASE_CDN
+  "./apple-touch-icon.png", "./favicon.ico", "./media/login-poster.jpg", SUPABASE_CDN
 ];
 
 self.addEventListener("install", event => {
@@ -22,8 +22,10 @@ self.addEventListener("message", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
   const isLocal = event.request.url.startsWith(self.location.origin);
   if (!isLocal && event.request.url !== SUPABASE_CDN) return;
+  if (url.pathname.endsWith(".mp4") || event.request.headers.has("range")) return;
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).then(response => {
       const copy = response.clone();

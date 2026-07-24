@@ -84,5 +84,36 @@
     return value;
   }
 
-  return { decide, escapeAttr: escapeHtml, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup };
+  function normalizeSchedule(schedule) {
+    if (!Array.isArray(schedule) || !schedule.length || schedule.length > 14) throw new Error("Schedule must contain 1–14 days.");
+    const dayNames = new Set();
+    return schedule.map((item, dayIndex) => {
+      const day = String(item?.day || "").trim();
+      const title = String(item?.title || "").trim();
+      const focus = String(item?.focus || item?.type || "").trim();
+      const type = String(item?.type || focus).trim();
+      if (!day || !title) throw new Error(`Schedule day ${dayIndex + 1} needs a day label and title.`);
+      const dayKey = day.toLocaleLowerCase();
+      if (dayNames.has(dayKey)) throw new Error(`Day label "${day}" is duplicated.`);
+      dayNames.add(dayKey);
+      if (!Array.isArray(item.exs) || !item.exs.length) throw new Error(`${day} needs at least one exercise.`);
+      const exerciseIds = new Set();
+      const exs = item.exs.map((exercise, exerciseIndex) => {
+        const name = String(exercise?.[0] || "").trim();
+        const sets = String(exercise?.[1] || "").trim();
+        const reps = normalizeRange(exercise?.[2]);
+        const note = String(exercise?.[3] || "").trim();
+        const id = String(exercise?.[4] || slugifyExercise(name)).trim();
+        const aliases = Array.isArray(exercise?.[5]) ? exercise[5].map(alias => String(alias).trim()).filter(Boolean) : [];
+        if (!name || !sets || !reps) throw new Error(`${day}, exercise ${exerciseIndex + 1} needs a name, sets, and rep range.`);
+        if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error(`${day}: "${name}" has an invalid stable ID.`);
+        if (exerciseIds.has(id)) throw new Error(`${day}: stable ID "${id}" is duplicated.`);
+        exerciseIds.add(id);
+        return [name, sets, reps, note, id, [...new Set(aliases)]];
+      });
+      return { day, type, title, focus, exs };
+    });
+  }
+
+  return { decide, escapeAttr: escapeHtml, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup };
 });

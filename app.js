@@ -4,7 +4,7 @@
 const SUPABASE_URL = "https://txdiazrvochdrlmlahbo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_c2FUhLGrPLvD8w6dj74TCQ_xolv2TEy";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-const {decide,escapeAttr,escapeHtml,exerciseIdentity,isUuid,localDateKey,normalizeRange,personalRecord,progressSeries,rangeMidpoint,slugifyExercise,validateBackup}=DivinityCore;
+const {decide,escapeAttr,escapeHtml,exerciseIdentity,isUuid,localDateKey,normalizeRange,normalizeSchedule,personalRecord,progressSeries,rangeMidpoint,slugifyExercise,validateBackup}=DivinityCore;
 
 const PROFILES = globalThis.DIVINITY_PROFILES;
 const COMPLETE_EX = "__WORKOUT_COMPLETE__";
@@ -59,8 +59,16 @@ function renderNavigation(){
   qs("mobile-nav").innerHTML=NAV_ITEMS.filter(item=>item.mobile).map(item=>`<button class="${item.page==="dashboard"?"active":""}" data-page="${item.page}">${item.mobile}</button>`).join("");
 }
 function showPage(page){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));qs("page-"+page).classList.add("active");setActiveButtons(page);renderAll()}
-function showProfilePicker(){renderProfilePicker();qs("profile-screen").classList.add("show")}
-function hideProfilePicker(){qs("profile-screen").classList.remove("show")}
+function updateModalLock(){document.body.classList.toggle("modal-open",!!document.querySelector(".auth.show,.profile-screen.show"))}
+function showProfilePicker(){renderProfilePicker();qs("profile-screen").classList.add("show");updateModalLock()}
+function hideProfilePicker(){qs("profile-screen").classList.remove("show");updateModalLock()}
+function setLoginVisible(visible){
+  qs("auth").classList.toggle("show",visible);
+  updateModalLock();
+  const video=qs("login-video");
+  if(!visible||matchMedia("(prefers-reduced-motion: reduce)").matches){video.pause();return}
+  video.play().catch(()=>{});
+}
 
 async function signInPassword(){
   const email=qs("login-email").value.trim(), password=qs("login-password").value;
@@ -75,7 +83,7 @@ async function resetPassword(){
   const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
   qs("auth-msg").textContent=error?error.message:"Password reset email sent.";
 }
-function showPasswordRecovery(){qs("password-recovery").classList.add("show");qs("recovery-password").focus()}
+function showPasswordRecovery(){qs("password-recovery").classList.add("show");updateModalLock();qs("recovery-password").focus()}
 async function updateRecoveredPassword(){
   const password=qs("recovery-password").value,confirmation=qs("recovery-confirm").value,msg=qs("recovery-msg");
   if(password.length<8){msg.textContent="Use at least 8 characters.";return}
@@ -84,6 +92,7 @@ async function updateRecoveredPassword(){
   const {error}=await supabaseClient.auth.updateUser({password});
   if(error){msg.textContent=error.message;return}
   qs("password-recovery").classList.remove("show");
+  updateModalLock();
   history.replaceState(null,"",window.location.pathname);
   toast("Password updated");
 }
@@ -92,8 +101,8 @@ async function getUser(){const {data,error}=await supabaseClient.auth.getUser();
 async function checkAuth(){
   setSync("", "Checking");
   user=await getUser();
-  if(!user){qs("auth").classList.add("show");setSync("bad","Signed out");return}
-  qs("auth").classList.remove("show");
+  if(!user){setLoginVisible(true);setSync("bad","Signed out");return}
+  setLoginVisible(false);
   await loadAllData();
   if(!localStorage.getItem("divinity-profile")) showProfilePicker();
 }
@@ -106,8 +115,8 @@ async function ensureProfileSettings(){
   for(const p of PROFILES){
     if(profileSettings[p.key]) continue;
     const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
-    await upsertProfileSettings(row);
-    profileSettings[p.key]={...p,...row};
+    const saved=await upsertProfileSettings(row);
+    profileSettings[p.key]={...p,...row,...saved};
   }
 }
 
@@ -118,7 +127,7 @@ async function loadAllData(show=true){
     if(!user){entries=[];renderAll();return}
     const settingsRows=queryData(await supabaseClient.from("profile_settings").select("*").eq("user_id",user.id),"Could not load profile settings");
     profileSettings={};
-    settingsRows.forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r}});
+    settingsRows.forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r,schedule_json:normalizeSchedule(r.schedule_json)}});
     await ensureProfileSettings();
     const [entryRows,checkinRows]=await Promise.all([loadWorkoutEntries(),loadCheckins()]);
     allEntries=entryRows.map(mapWorkoutEntry);
@@ -144,7 +153,14 @@ async function loadCheckins(){
 }
 
 function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,title:r.workout_title,ex:r.exercise,exerciseId:stableEntryExerciseId(r.exercise,r.exercise_id),load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,setType:r.set_type||"work",deletedAt:r.deleted_at,created:r.created_at}}
-async function upsertProfileSettings(row){const {error}=await supabaseClient.from("profile_settings").upsert(row,{onConflict:"user_id,profile_key"});if(error)throw error}
+async function upsertProfileSettings(row){
+  const expectedSchedule=normalizeSchedule(row.schedule_json);
+  const {data,error}=await supabaseClient.from("profile_settings").upsert({...row,schedule_json:expectedSchedule},{onConflict:"user_id,profile_key"}).select("profile_key,display_name,expected_sessions_per_week,schedule_json").single();
+  if(error)throw error;
+  const persistedSchedule=normalizeSchedule(data.schedule_json);
+  if(JSON.stringify(persistedSchedule)!==JSON.stringify(expectedSchedule))throw new Error("Saved schedule did not match the Supabase response.");
+  return {...data,schedule_json:persistedSchedule};
+}
 
 function switchProfile(key, close=false){
   currentProfileKey=key;localStorage.setItem("divinity-profile",key);
@@ -175,12 +191,12 @@ function fillProfileSelects(){
   ["log-profile","edit-profile"].forEach(id=>{if(qs(id)) qs(id).innerHTML=opts});
   qs("log-profile").value=currentProfileKey;
 }
-function fillDaySelect(){
+function fillDaySelect(preferredDay=""){
   if(!qs("log-day")) return;
   fillProfileSelects();
   const sched=activeSchedule(currentProfileKey);
   qs("log-day").innerHTML=sched.map(d=>`<option value="${escapeAttr(d.day)}">${escapeHtml(d.day)} — ${escapeHtml(d.title)}</option>`).join("");
-  qs("log-day").value=sched[nextDayIndex(currentProfileKey)].day;
+  qs("log-day").value=sched.some(d=>d.day===preferredDay)?preferredDay:sched[nextDayIndex(currentProfileKey)].day;
   fillExercisesForDay();
 }
 // Only sets newer than this day's latest completion belong to the current loop.
@@ -209,7 +225,7 @@ function clearForm(){["log-rir","log-notes"].forEach(id=>qs(id).value="");qs("de
 
 async function insertRow(row){
   user = user || await getUser();
-  if(!user){qs("auth").classList.add("show");toast("Sign in first");return false}
+  if(!user){setLoginVisible(true);toast("Sign in first");return false}
   setSync("", "Saving");
   const {error}=await supabaseClient.from("workout_entries").insert({...row,user_id:user.id,profile_key:currentProfileKey,profile_name:activeProfile().name});
   if(error){reportError("Could not save workout entry",error);return false}
@@ -291,7 +307,7 @@ function renderLoads(){
   const rows=Object.values(map); setEmptyState("loads-empty",rows.length>0);
   qs("loads-body").innerHTML=rows.map(e=>`<tr><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load)} kg</td><td class="mono">${escapeHtml(e.s1)}${e.s2?"/"+escapeHtml(e.s2):""}</td><td class="mono">${escapeHtml(e.range)}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`).join("");
 }
-function buildFilters(){const fs=["all","current","Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","increase","complete"]; qs("filters").innerHTML=fs.map(f=>`<button class="${histFilter===f?'active':''}" data-filter="${f}">${f}</button>`).join("")}
+function buildFilters(){const fs=["all","current",...activeSchedule().map(day=>day.day),"increase","complete"];if(!fs.includes(histFilter))histFilter="all";qs("filters").innerHTML=fs.map(f=>`<button class="${histFilter===f?'active':''}" data-filter="${f}">${escapeHtml(f)}</button>`).join("")}
 function renderHistory(){
   buildFilters(); let rows=entries;
   if(histFilter==="current") rows=profileEntries();
@@ -324,7 +340,7 @@ function renderTrash(){const rows=allEntries.filter(entry=>entry.deletedAt&&entr
 function renderSchedule(){
   qs("schedule-title").textContent=`${activeProfile().name} schedule`;
   qs("schedule-expected").textContent=`${activeSettings().expected_sessions_per_week} / week`;
-  qs("schedule-grid").innerHTML=activeSchedule().map(d=>`<div class="day-card"><div class="day-head"><div class="circle">${escapeHtml(String(d.day).replace("Day ",""))}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}</span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}</span></div>`).join("")}</div>`).join("");
+  qs("schedule-grid").innerHTML=activeSchedule().map((d,index)=>`<div class="day-card"><div class="day-head"><div class="circle">${index+1}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.day)} · ${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}</span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}</span></div>`).join("")}</div>`).join("");
 }
 function renderSettings(){
   qs("settings-profile").textContent=activeProfile().name;
@@ -342,15 +358,17 @@ function loadEditorForProfile(key){
   editorProfileKey=key;
   const st=activeSettings(key); qs("edit-expected").value=st.expected_sessions_per_week;
   qs("edit-profile-tag").textContent=profileByKey(key).name;
-  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label>Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}"></div><div class="field"><label>Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}"></div></div><div class="field" style="margin-top:10px"><label>Exercises — name | sets | reps | note | stable ID | aliases</label><textarea id="ed-exs-${idx}">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", ")].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
+  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label>Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}"></div><div class="field"><label>Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}"></div><div class="field"><label>Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}"></div></div><div class="field" style="margin-top:10px"><label>Exercises — name | sets | reps | note | stable ID | aliases</label><textarea id="ed-exs-${idx}">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", ")].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
 }
 function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||"",parts[4]||slugifyExercise(parts[0]),parts[5]?parts[5].split(",").map(x=>x.trim()).filter(Boolean):[]]})}
 async function saveEditedSchedule(){
   try{
-    const base=activeSettings(editorProfileKey); const sched=(base.schedule_json||[]).map((d,idx)=>({...d,title:qs(`ed-title-${idx}`).value.trim()||d.title,focus:qs(`ed-focus-${idx}`).value.trim()||d.focus,exs:parseExerciseLines(qs(`ed-exs-${idx}`).value)}));
-    const row={user_id:user.id,profile_key:editorProfileKey,display_name:profileByKey(editorProfileKey).name,expected_sessions_per_week:Number(qs("edit-expected").value)||0,schedule_json:sched};
+    const selectedDay=qs("log-day").value,expectedSessions=Number(qs("edit-expected").value);
+    if(!Number.isFinite(expectedSessions)||expectedSessions<0||expectedSessions>14)throw new Error("Expected sessions must be between 0 and 14.");
+    const base=activeSettings(editorProfileKey); const sched=normalizeSchedule((base.schedule_json||[]).map((d,idx)=>({...d,day:qs(`ed-day-${idx}`).value.trim(),title:qs(`ed-title-${idx}`).value.trim(),focus:qs(`ed-focus-${idx}`).value.trim(),exs:parseExerciseLines(qs(`ed-exs-${idx}`).value)})));
+    const row={user_id:user.id,profile_key:editorProfileKey,display_name:profileByKey(editorProfileKey).name,expected_sessions_per_week:expectedSessions,schedule_json:sched};
     await upsertProfileSettings(row);
-    toast("Schedule saved"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
+    toast("Schedule saved and verified"); await loadAllData(false); loadEditorForProfile(editorProfileKey);if(editorProfileKey===currentProfileKey)fillDaySelect(selectedDay);
   }catch(error){reportError("Could not save schedule",error)}
 }
 async function resetEditedSchedule(){
@@ -358,7 +376,7 @@ async function resetEditedSchedule(){
   try{
     const p=profileByKey(editorProfileKey); const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
     await upsertProfileSettings(row);
-    toast("Schedule reset"); await loadAllData(false); loadEditorForProfile(editorProfileKey);
+    toast("Schedule reset"); await loadAllData(false); loadEditorForProfile(editorProfileKey);if(editorProfileKey===currentProfileKey)fillDaySelect();
   }catch(error){reportError("Could not reset schedule",error)}
 }
 function exportBackup(){
