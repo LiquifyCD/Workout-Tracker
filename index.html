@@ -103,7 +103,7 @@
         </div>
         <div class="field" style="margin-top:12px"><label for="log-ex">Exercise</label><select id="log-ex"></select></div>
         <div class="formgrid four" style="margin-top:12px">
-          <div class="field"><label for="log-load">Load kg</label><input id="log-load" type="number" min="0" max="2000" step="0.5" placeholder="60"></div>
+          <div class="field"><label for="log-load">Load kg</label><input id="log-load" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" maxlength="8" placeholder="60.25" aria-describedby="log-load-hint"><span id="log-load-hint" class="field-hint">Use a decimal point or comma.</span></div>
           <div class="field"><label for="log-s1">Set 1 reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
           <div class="field"><label for="log-s2">Set 2 reps</label><input id="log-s2" type="number" min="0" max="50" placeholder="5"></div>
           <div class="field"><label for="log-rir">RIR</label><input id="log-rir" type="number" min="0" max="5" placeholder="1"></div>
@@ -143,26 +143,35 @@
     </section>
 
     <section id="page-settings" class="page">
-      <div class="section"><h2>Settings</h2><div class="btnrow"><button class="btn" data-action="show-profile-picker">Switch profile</button><button class="btn bad" data-action="sign-out">Logout</button></div></div>
-      <div class="grid3">
-        <div class="stat"><div class="label">Selected profile</div><div class="value" id="settings-profile">Alfred</div><div class="sub"><button class="btn small ghost" data-action="show-profile-picker">Switch profile</button></div></div>
-        <div class="stat"><div class="label">Estimated DB use</div><div class="value" id="usage-mb">0 MB</div><div class="sub" id="usage-sub">safe</div></div>
-        <div class="stat"><div class="label">Rows</div><div class="value" id="usage-rows">0</div><div class="sub">logs + check-ins + settings</div></div>
-      </div>
+      <div class="section"><div><h2>Settings</h2><p class="meta">Manage your training plan, data, and account.</p></div></div>
+
+      <div class="section settings-section"><h2>Training plan</h2><span class="tag" id="edit-profile-tag">Profile</span></div>
       <div class="card pad">
-        <div class="section" style="margin-top:0"><h2>Edit profile schedule</h2><span class="tag" id="edit-profile-tag">Profile</span></div>
         <div class="formgrid">
           <div class="field"><label for="edit-profile">Profile</label><select id="edit-profile"></select></div>
           <div class="field"><label for="edit-expected">Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>
         </div>
         <div id="schedule-editor" class="stack" style="margin-top:12px"></div>
-        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="save-schedule">Save schedule</button><button class="btn ghost" data-action="reset-schedule">Reset selected default</button><button class="btn" data-action="export-backup">Export backup</button><button class="btn" data-action="choose-import">Import backup</button><button id="install-app" class="btn" data-action="install-app" hidden>Install app</button></div>
+        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="save-schedule">Save schedule</button><button class="btn ghost" data-action="reset-schedule">Reset selected default</button></div>
+      </div>
+
+      <div class="section settings-section"><h2>Data &amp; storage</h2></div>
+      <div class="card pad">
+        <div class="settings-metrics">
+          <div class="stat compact"><div class="label">Estimated DB use</div><div class="value" id="usage-mb">0 MB</div><div class="sub" id="usage-sub">safe</div></div>
+          <div class="stat compact"><div class="label">Rows</div><div class="value" id="usage-rows">0</div><div class="sub">logs + check-ins + settings</div></div>
+        </div>
+        <div class="btnrow" style="margin-top:14px"><button class="btn" data-action="export-backup">Export backup</button><button class="btn" data-action="choose-import">Import backup</button><button id="install-app" class="btn" data-action="install-app" hidden>Install app</button></div>
         <input id="import-file" type="file" accept="application/json,.json" hidden>
+        <div class="warnbox" style="margin-top:12px"><b>Storage estimate:</b> exact Supabase database size requires private dashboard access, so Divinity estimates usage from synced row counts.</div>
+        <div class="warnbox" id="usage-detail" style="margin-top:12px"></div>
       </div>
-      <div class="warnbox" style="margin-top:12px">
-        <b>Storage alert:</b> the public site cannot read exact Supabase database size without a secret admin key. Divinity estimates usage from row counts and warns long before the free 500 MB database limit.
+
+      <div class="section settings-section"><h2>Account</h2></div>
+      <div class="card pad account-panel">
+        <div><div class="label">Selected profile</div><div class="account-profile" id="settings-profile">Alfred</div></div>
+        <div class="btnrow"><button class="btn" data-action="show-profile-picker">Switch profile</button><button class="btn bad" data-action="sign-out">Logout</button></div>
       </div>
-      <div class="warnbox" id="usage-detail" style="margin-top:12px"></div>
     </section>
   </main>
 

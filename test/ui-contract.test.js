@@ -28,6 +28,7 @@ test("saved schedule changes refresh editable day controls", () => {
 });
 
 test("offline install does not depend on the external Supabase CDN", () => {
+  assert.match(serviceWorker, /const CACHE = "divinity-v5"/);
   const shell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\];/)?.[1] || "";
   assert.doesNotMatch(shell, /SUPABASE_CDN/);
   assert.match(serviceWorker, /event\.waitUntil\(caches\.open\(CACHE\)\.then\(cache => cache\.put/);
@@ -39,4 +40,19 @@ test("forms and modal status are accessible", () => {
   }
   assert.match(html, /id="auth-msg"[^>]+aria-live="polite"/);
   assert.match(app, /element\.inert=!!modal/);
+});
+
+test("mobile controls avoid automatic zoom and load accepts decimals", () => {
+  assert.match(html, /id="log-load" type="text" inputmode="decimal"/);
+  assert.match(app, /parseDecimal\(qs\("log-load"\)\.value\)/);
+  assert.match(app, /min-width: 901px\) and \(pointer: fine/);
+  assert.doesNotMatch(app, /recovery-password"\)\.focus/);
+  assert.match(css, /button,input,select,textarea\{font:inherit;touch-action:manipulation\}/);
+  assert.match(css, /@media\(max-width:900px\)[\s\S]*input,select,textarea\{font-size:16px\}/);
+});
+
+test("settings are split into focused sections", () => {
+  assert.match(html, /Training plan/);
+  assert.match(html, /Data &amp; storage/);
+  assert.match(html, /<h2>Account<\/h2>/);
 });

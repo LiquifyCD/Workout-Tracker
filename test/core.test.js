@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { decide, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup } = require("../core.js");
+const { decide, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, parseDecimal, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup } = require("../core.js");
 
 test("escapes stored HTML before rendering", () => {
   assert.equal(escapeHtml(`<img src=x onerror="alert(1)">'`), "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&#39;");
@@ -55,6 +55,12 @@ test("normalizes and validates edited schedules before persistence", () => {
   assert.throws(() => normalizeSchedule([{...schedule[0]}, {...schedule[0]}]), /duplicated/);
   assert.throws(() => normalizeSchedule([{...schedule[0]}, {...schedule[0], day: "Pull"}]), /Stable day ID/);
   assert.throws(() => normalizeSchedule([{...schedule[0], exs: []}]), /at least one exercise/);
+});
+
+test("accepts decimal loads with a point or comma", () => {
+  assert.equal(parseDecimal("72.25"), 72.25);
+  assert.equal(parseDecimal("72,25"), 72.25);
+  assert.equal(Number.isNaN(parseDecimal("72kg")), true);
 });
 
 test("rejects unreasonably large backups", () => {

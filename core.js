@@ -19,6 +19,11 @@
     return match ? `${match[1]}-${match[2]}` : "";
   }
 
+  function parseDecimal(value) {
+    const normalized = String(value ?? "").trim().replace(",", ".");
+    return /^\d+(?:\.\d+)?$/.test(normalized) ? Number(normalized) : Number.NaN;
+  }
+
   function rangeMidpoint(range) {
     const normalized = normalizeRange(range);
     if (!normalized) return 0;
@@ -123,5 +128,5 @@
     });
   }
 
-  return { decide, escapeAttr: escapeHtml, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup };
+  return { decide, escapeAttr: escapeHtml, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, parseDecimal, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup };
 });

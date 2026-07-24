@@ -4,7 +4,7 @@
 const SUPABASE_URL = "https://txdiazrvochdrlmlahbo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_c2FUhLGrPLvD8w6dj74TCQ_xolv2TEy";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-const {decide,escapeAttr,escapeHtml,exerciseIdentity,isUuid,localDateKey,normalizeRange,normalizeSchedule,personalRecord,progressSeries,rangeMidpoint,slugifyExercise,validateBackup}=DivinityCore;
+const {decide,escapeAttr,escapeHtml,exerciseIdentity,isUuid,localDateKey,normalizeRange,normalizeSchedule,parseDecimal,personalRecord,progressSeries,rangeMidpoint,slugifyExercise,validateBackup}=DivinityCore;
 
 const PROFILES = globalThis.DIVINITY_PROFILES;
 const COMPLETE_EX = "__WORKOUT_COMPLETE__";
@@ -64,13 +64,14 @@ function renderNavigation(){
   qs("mobile-nav").innerHTML=NAV_ITEMS.filter(item=>item.mobile).map(item=>`<button class="${item.page==="dashboard"?"active":""}" data-page="${item.page}">${item.mobile}</button>`).join("");
 }
 function showPage(page){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));qs("page-"+page).classList.add("active");setActiveButtons(page)}
+function shouldAutofocus(){return matchMedia("(min-width: 901px) and (pointer: fine)").matches}
 function updateModalLock(){
   const modal=document.querySelector(".auth.show,.profile-screen.show");
   document.body.classList.toggle("modal-open",!!modal);
   [document.querySelector(".topbar"),document.querySelector(".app"),document.querySelector(".bottomnav")].forEach(element=>{if(element)element.inert=!!modal});
   if(modal){
     if(!modalReturnFocus)modalReturnFocus=document.activeElement;
-    queueMicrotask(()=>modal.querySelector("input,select,button")?.focus());
+    if(shouldAutofocus())queueMicrotask(()=>modal.querySelector("input,select,button")?.focus());
   }else if(modalReturnFocus){
     const target=modalReturnFocus;modalReturnFocus=null;target?.focus?.();
   }
@@ -98,7 +99,7 @@ async function resetPassword(){
   const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
   qs("auth-msg").textContent=error?error.message:"Password reset email sent.";
 }
-function showPasswordRecovery(){qs("password-recovery").classList.add("show");updateModalLock();qs("recovery-password").focus()}
+function showPasswordRecovery(){qs("password-recovery").classList.add("show");updateModalLock()}
 async function updateRecoveredPassword(){
   const password=qs("recovery-password").value,confirmation=qs("recovery-confirm").value,msg=qs("recovery-msg");
   if(password.length<8){msg.textContent="Use at least 8 characters.";return}
@@ -249,7 +250,7 @@ async function insertRow(row){
   setSync("ok","Synced"); await loadAllData(false); return true;
 }
 async function addEntry(){
-  const dayRef=qs("log-day").value, exercise=selectedExercise(), ex=exercise?.[0], exerciseId=stableExerciseId(exercise), setType=qs("log-set-type").value, load=parseFloat(qs("log-load").value), s1=parseInt(qs("log-s1").value), s2=parseInt(qs("log-s2").value)||0, rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
+  const dayRef=qs("log-day").value, exercise=selectedExercise(), ex=exercise?.[0], exerciseId=stableExerciseId(exercise), setType=qs("log-set-type").value, load=parseDecimal(qs("log-load").value), s1=parseInt(qs("log-s1").value), s2=parseInt(qs("log-s2").value)||0, rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
   const required=["log-load","log-s1",...(setType==="work"?["log-rir"]:[])];
   const invalid=required.find(id=>!qs(id).value||!qs(id).checkValidity());
   if(!exercise||!["work","warmup"].includes(setType)||invalid||!Number.isFinite(load)||!Number.isInteger(s1)||(setType==="work"&&!Number.isInteger(rir))){if(invalid)qs(invalid).reportValidity();toast("Check the set values");return}
