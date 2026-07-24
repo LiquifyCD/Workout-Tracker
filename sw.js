@@ -1,11 +1,11 @@
 "use strict";
 
-const CACHE = "divinity-v3";
+const CACHE = "divinity-v4";
 const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./data/programs.js", "./core.js", "./app.js",
   "./site.webmanifest", "./android-chrome-192x192.png", "./android-chrome-512x512.png",
-  "./apple-touch-icon.png", "./favicon.ico", "./media/login-poster.jpg", SUPABASE_CDN
+  "./apple-touch-icon.png", "./favicon.ico", "./media/login-poster.jpg"
 ];
 
 self.addEventListener("install", event => {
@@ -29,13 +29,13 @@ self.addEventListener("fetch", event => {
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).then(response => {
       const copy = response.clone();
-      caches.open(CACHE).then(cache => cache.put("./index.html", copy));
+      event.waitUntil(caches.open(CACHE).then(cache => cache.put("./index.html", copy)));
       return response;
     }).catch(() => caches.match("./index.html")));
     return;
   }
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-    if (response.ok) caches.open(CACHE).then(cache => cache.put(event.request, response.clone()));
+    if (response.ok) event.waitUntil(caches.open(CACHE).then(cache => cache.put(event.request, response.clone())));
     return response;
   })));
 });

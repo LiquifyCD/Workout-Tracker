@@ -48,7 +48,16 @@ test("validates backup shape and UUIDs", () => {
 test("normalizes and validates edited schedules before persistence", () => {
   const schedule = normalizeSchedule([{ day: " Push ", type: "Upper", title: " Push day ", focus: "Chest", exs: [["Incline press", "2", "6–10", "", "incline-press", ["Press"]]] }]);
   assert.equal(schedule[0].day, "Push");
+  assert.equal(schedule[0].id, "push");
   assert.equal(schedule[0].exs[0][2], "6-10");
+  const renamed = normalizeSchedule([{...schedule[0], day: "Upper A"}]);
+  assert.equal(renamed[0].id, "push");
   assert.throws(() => normalizeSchedule([{...schedule[0]}, {...schedule[0]}]), /duplicated/);
+  assert.throws(() => normalizeSchedule([{...schedule[0]}, {...schedule[0], day: "Pull"}]), /Stable day ID/);
   assert.throws(() => normalizeSchedule([{...schedule[0], exs: []}]), /at least one exercise/);
+});
+
+test("rejects unreasonably large backups", () => {
+  assert.throws(() => validateBackup({ entries: Array(100001) }), /too many workout/);
+  assert.throws(() => validateBackup({ checkins: Array(20001) }), /too many check-ins/);
 });

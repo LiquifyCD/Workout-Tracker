@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
   <link rel="manifest" href="./site.webmanifest">
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7" integrity="sha384-BmlQlKlDvXvKoxkn5OQuUo/aJQCTXeB+Kls6EccBmG4Kf8AXvp89RtO9MtPxP/r5" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7" integrity="sha384-BmlQlKlDvXvKoxkn5OQuUo/aJQCTXeB+Kls6EccBmG4Kf8AXvp89RtO9MtPxP/r5" crossorigin="anonymous" defer></script>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -31,7 +31,7 @@
       <div class="field"><label for="login-email">Email</label><input id="login-email" type="email" autocomplete="email" placeholder="shared@email.com"></div>
       <div class="field" style="margin-top:10px"><label for="login-password">Password</label><input id="login-password" type="password" autocomplete="current-password" placeholder="Shared site password"></div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" data-action="sign-in">Login</button><button class="btn ghost" data-action="reset-password">Reset</button></div>
-      <p id="auth-msg" class="small"></p>
+      <p id="auth-msg" class="small" aria-live="polite"></p>
     </div>
   </div>
 
@@ -98,21 +98,21 @@
       <div class="section"><h2>Log set</h2><span class="tag purple" id="log-profile-tag">Profile</span></div>
       <div class="card pad">
         <div class="formgrid">
-          <div class="field"><label>Profile</label><select id="log-profile"></select></div>
-          <div class="field"><label>Loop day</label><select id="log-day"></select></div>
+          <div class="field"><label for="log-profile">Profile</label><select id="log-profile"></select></div>
+          <div class="field"><label for="log-day">Loop day</label><select id="log-day"></select></div>
         </div>
-        <div class="field" style="margin-top:12px"><label>Exercise</label><select id="log-ex"></select></div>
+        <div class="field" style="margin-top:12px"><label for="log-ex">Exercise</label><select id="log-ex"></select></div>
         <div class="formgrid four" style="margin-top:12px">
-          <div class="field"><label>Load kg</label><input id="log-load" type="number" step="0.5" placeholder="60"></div>
-          <div class="field"><label>Set 1 reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
-          <div class="field"><label>Set 2 reps</label><input id="log-s2" type="number" min="0" max="50" placeholder="5"></div>
-          <div class="field"><label>RIR</label><input id="log-rir" type="number" min="0" max="5" placeholder="1"></div>
+          <div class="field"><label for="log-load">Load kg</label><input id="log-load" type="number" min="0" max="2000" step="0.5" placeholder="60"></div>
+          <div class="field"><label for="log-s1">Set 1 reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
+          <div class="field"><label for="log-s2">Set 2 reps</label><input id="log-s2" type="number" min="0" max="50" placeholder="5"></div>
+          <div class="field"><label for="log-rir">RIR</label><input id="log-rir" type="number" min="0" max="5" placeholder="1"></div>
         </div>
         <div class="formgrid" style="margin-top:12px">
           <div class="field"><label for="log-set-type">Set type</label><select id="log-set-type"><option value="work">Work set</option><option value="warmup">Warm-up</option></select></div>
-          <div class="field"><label>Rep target</label><select id="log-range"><option value="4-7">4–7 stable compounds</option><option value="6-10">6–10 isolations</option><option value="8-15">8–15 raises</option><option value="6-12">6–12 calves</option></select></div>
+          <div class="field"><label for="log-range">Rep target</label><select id="log-range"><option value="4-7">4–7 stable compounds</option><option value="6-10">6–10 isolations</option><option value="8-15">8–15 raises</option><option value="6-12">6–12 calves</option></select></div>
         </div>
-        <div class="field" style="margin-top:12px"><label>Notes</label><input id="log-notes" type="text" placeholder="Form clean, slight fatigue..."></div>
+        <div class="field" style="margin-top:12px"><label for="log-notes">Notes</label><input id="log-notes" type="text" maxlength="2000" placeholder="Form clean, slight fatigue..."></div>
         <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="add-entry">Save set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button></div>
         <div id="log-preview" style="margin-top:16px"></div>
         <div id="decision" class="decision"><h3>Next decision</h3><div id="decision-main"></div><p id="decision-reason"></p></div>
@@ -152,8 +152,8 @@
       <div class="card pad">
         <div class="section" style="margin-top:0"><h2>Edit profile schedule</h2><span class="tag" id="edit-profile-tag">Profile</span></div>
         <div class="formgrid">
-          <div class="field"><label>Profile</label><select id="edit-profile"></select></div>
-          <div class="field"><label>Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>
+          <div class="field"><label for="edit-profile">Profile</label><select id="edit-profile"></select></div>
+          <div class="field"><label for="edit-expected">Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>
         </div>
         <div id="schedule-editor" class="stack" style="margin-top:12px"></div>
         <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="save-schedule">Save schedule</button><button class="btn ghost" data-action="reset-schedule">Reset selected default</button><button class="btn" data-action="export-backup">Export backup</button><button class="btn" data-action="choose-import">Import backup</button><button id="install-app" class="btn" data-action="install-app" hidden>Install app</button></div>

@@ -81,14 +81,19 @@
     if (value.entries != null && !Array.isArray(value.entries)) throw new Error("Backup entries must be an array.");
     if (value.profiles != null && (typeof value.profiles !== "object" || Array.isArray(value.profiles))) throw new Error("Backup profiles must be an object.");
     if (value.checkins != null && !Array.isArray(value.checkins)) throw new Error("Backup check-ins must be an array.");
+    if ((value.entries?.length || 0) > 100000) throw new Error("Backup contains too many workout entries.");
+    if ((value.checkins?.length || 0) > 20000) throw new Error("Backup contains too many check-ins.");
+    if (Object.keys(value.profiles || {}).length > 20) throw new Error("Backup contains too many profiles.");
     return value;
   }
 
   function normalizeSchedule(schedule) {
     if (!Array.isArray(schedule) || !schedule.length || schedule.length > 14) throw new Error("Schedule must contain 1–14 days.");
     const dayNames = new Set();
+    const dayIds = new Set();
     return schedule.map((item, dayIndex) => {
       const day = String(item?.day || "").trim();
+      const id = String(item?.id || slugifyExercise(day)).trim();
       const title = String(item?.title || "").trim();
       const focus = String(item?.focus || item?.type || "").trim();
       const type = String(item?.type || focus).trim();
@@ -96,6 +101,9 @@
       const dayKey = day.toLocaleLowerCase();
       if (dayNames.has(dayKey)) throw new Error(`Day label "${day}" is duplicated.`);
       dayNames.add(dayKey);
+      if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error(`${day}: stable day ID is invalid.`);
+      if (dayIds.has(id)) throw new Error(`Stable day ID "${id}" is duplicated.`);
+      dayIds.add(id);
       if (!Array.isArray(item.exs) || !item.exs.length) throw new Error(`${day} needs at least one exercise.`);
       const exerciseIds = new Set();
       const exs = item.exs.map((exercise, exerciseIndex) => {
@@ -111,7 +119,7 @@
         exerciseIds.add(id);
         return [name, sets, reps, note, id, [...new Set(aliases)]];
       });
-      return { day, type, title, focus, exs };
+      return { id, day, type, title, focus, exs };
     });
   }
 

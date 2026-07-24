@@ -22,15 +22,20 @@ let profileSettings = {};
 let user = null;
 let currentProfileKey = localStorage.getItem("divinity-profile") || "alfred";
 let histFilter = "all";
-let editorProfileKey = "alfred";
+let editorProfileKey = currentProfileKey;
 let historyPage = 0;
 let lastDeletedId = null;
 let timerInterval = null;
 let timerEndsAt = 0;
 let deferredInstallPrompt = null;
 let waitingWorker = null;
+let toastTimer = null;
+let modalReturnFocus = null;
 const DATA_PAGE_SIZE = 500;
 const HISTORY_PAGE_SIZE = 50;
+const PROFILE_COLUMNS = "profile_key,display_name,expected_sessions_per_week,schedule_json";
+const WORKOUT_COLUMNS = "id,entry_date,profile_key,loop_day,schedule_day_id,workout_title,exercise,exercise_id,load_kg,set_1_reps,set_2_reps,rir,rep_range,decision,notes,is_rest_day,set_type,deleted_at,created_at";
+const CHECKIN_COLUMNS = "id,profile_key,entry_date,body_weight_kg,sleep_hours,readiness,pain_notes";
 
 function qs(id){return document.getElementById(id)}
 function profileByKey(key){return PROFILES.find(p=>p.key===key)||PROFILES[0]}
@@ -44,12 +49,12 @@ function stableEntryExerciseId(name,explicitId){const derived=slugifyExercise(na
 function activeProfile(){return profileByKey(currentProfileKey)}
 function activeSettings(key=currentProfileKey){return profileSettings[key] || {...profileByKey(key), schedule_json: profileByKey(key).defaultSchedule, expected_sessions_per_week: profileByKey(key).defaultExpected}}
 function activeSchedule(key=currentProfileKey){return activeSettings(key).schedule_json || profileByKey(key).defaultSchedule}
-function toast(msg){const t=qs("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}
+function toast(msg,type=""){const t=qs("toast");clearTimeout(toastTimer);t.textContent=msg;t.className=`toast ${type} show`.trim();toastTimer=setTimeout(()=>{t.className="toast"},type==="error"?5000:2500)}
 function setSync(status,msg){const d=qs("sync-dot"), s=qs("sync-text"); d.className="dot "+(status||""); s.textContent=msg;}
 function reportError(context,error){
   console.error(context,error);
   setSync("bad","Error");
-  alert(`${context}: ${error?.message||error}`);
+  toast(`${context}: ${error?.message||error}`,"error");
 }
 function queryData(result,context){if(result.error)throw new Error(`${context}: ${result.error.message}`);return result.data||[]}
 function setEmptyState(id,hasRows){qs(id).style.display=hasRows?"none":"block"}
@@ -58,8 +63,18 @@ function renderNavigation(){
   qs("desktop-nav").innerHTML=NAV_ITEMS.map(item=>`<button class="${item.page==="dashboard"?"active":""}" data-page="${item.page}">${item.desktop}</button>`).join("");
   qs("mobile-nav").innerHTML=NAV_ITEMS.filter(item=>item.mobile).map(item=>`<button class="${item.page==="dashboard"?"active":""}" data-page="${item.page}">${item.mobile}</button>`).join("");
 }
-function showPage(page){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));qs("page-"+page).classList.add("active");setActiveButtons(page);renderAll()}
-function updateModalLock(){document.body.classList.toggle("modal-open",!!document.querySelector(".auth.show,.profile-screen.show"))}
+function showPage(page){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));qs("page-"+page).classList.add("active");setActiveButtons(page)}
+function updateModalLock(){
+  const modal=document.querySelector(".auth.show,.profile-screen.show");
+  document.body.classList.toggle("modal-open",!!modal);
+  [document.querySelector(".topbar"),document.querySelector(".app"),document.querySelector(".bottomnav")].forEach(element=>{if(element)element.inert=!!modal});
+  if(modal){
+    if(!modalReturnFocus)modalReturnFocus=document.activeElement;
+    queueMicrotask(()=>modal.querySelector("input,select,button")?.focus());
+  }else if(modalReturnFocus){
+    const target=modalReturnFocus;modalReturnFocus=null;target?.focus?.();
+  }
+}
 function showProfilePicker(){renderProfilePicker();qs("profile-screen").classList.add("show");updateModalLock()}
 function hideProfilePicker(){qs("profile-screen").classList.remove("show");updateModalLock()}
 function setLoginVisible(visible){
@@ -125,7 +140,7 @@ async function loadAllData(show=true){
     if(show)setSync("","Loading");
     user=user||await getUser();
     if(!user){entries=[];renderAll();return}
-    const settingsRows=queryData(await supabaseClient.from("profile_settings").select("*").eq("user_id",user.id),"Could not load profile settings");
+    const settingsRows=queryData(await supabaseClient.from("profile_settings").select(PROFILE_COLUMNS).eq("user_id",user.id),"Could not load profile settings");
     profileSettings={};
     settingsRows.forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r,schedule_json:normalizeSchedule(r.schedule_json)}});
     await ensureProfileSettings();
@@ -141,7 +156,7 @@ async function loadAllData(show=true){
 async function loadWorkoutEntries(){
   const rows=[];
   for(let from=0;;from+=DATA_PAGE_SIZE){
-    const result=await supabaseClient.from("workout_entries").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).order("id",{ascending:false}).range(from,from+DATA_PAGE_SIZE-1);
+    const result=await supabaseClient.from("workout_entries").select(WORKOUT_COLUMNS).eq("user_id",user.id).order("created_at",{ascending:false}).order("id",{ascending:false}).range(from,from+DATA_PAGE_SIZE-1);
     const page=queryData(result,"Could not load workout entries");
     rows.push(...page);
     if(page.length<DATA_PAGE_SIZE) return rows;
@@ -149,10 +164,10 @@ async function loadWorkoutEntries(){
 }
 
 async function loadCheckins(){
-  return queryData(await supabaseClient.from("daily_checkins").select("*").eq("user_id",user.id).order("entry_date",{ascending:false}),"Could not load daily check-ins");
+  return queryData(await supabaseClient.from("daily_checkins").select(CHECKIN_COLUMNS).eq("user_id",user.id).order("entry_date",{ascending:false}),"Could not load daily check-ins");
 }
 
-function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,title:r.workout_title,ex:r.exercise,exerciseId:stableEntryExerciseId(r.exercise,r.exercise_id),load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,setType:r.set_type||"work",deletedAt:r.deleted_at,created:r.created_at}}
+function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,dayId:r.schedule_day_id||slugifyExercise(r.loop_day),title:r.workout_title,ex:r.exercise,exerciseId:stableEntryExerciseId(r.exercise,r.exercise_id),load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,setType:r.set_type||"work",deletedAt:r.deleted_at,created:r.created_at}}
 async function upsertProfileSettings(row){
   const expectedSchedule=normalizeSchedule(row.schedule_json);
   const {data,error}=await supabaseClient.from("profile_settings").upsert({...row,schedule_json:expectedSchedule},{onConflict:"user_id,profile_key"}).select("profile_key,display_name,expected_sessions_per_week,schedule_json").single();
@@ -164,18 +179,19 @@ async function upsertProfileSettings(row){
 
 function switchProfile(key, close=false){
   currentProfileKey=key;localStorage.setItem("divinity-profile",key);
+  editorProfileKey=key;
   if(close) hideProfilePicker();
   renderAll();
-  fillDaySelect();
+  loadEditorForProfile(key);
 }
 function profileEntries(key=currentProfileKey){return entries.filter(e=>e.profile===key)}
 function completedEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex===COMPLETE_EX&&!e.isRest)}
 function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest&&e.setType!=="warmup")}
 function loggedSetEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest)}
-function scheduleByDay(day,key=currentProfileKey){return activeSchedule(key).find(x=>x.day===day)||activeSchedule(key)[0]}
+function scheduleByDay(dayRef,key=currentProfileKey){return activeSchedule(key).find(x=>x.id===dayRef||x.day===dayRef)||activeSchedule(key)[0]}
 // Completion rows are already newest-first, so advancing follows the configured
 // schedule order instead of assuming that day labels contain consecutive numbers.
-function nextDayIndex(key=currentProfileKey){const schedule=activeSchedule(key);const c=completedEntries(key)[0];if(!c)return 0;const idx=schedule.findIndex(d=>d.day===c.day);return idx<0?0:(idx+1)%schedule.length}
+function nextDayIndex(key=currentProfileKey){const schedule=activeSchedule(key);const c=completedEntries(key)[0];if(!c)return 0;const idx=schedule.findIndex(d=>d.id===c.dayId||d.day===c.day);return idx<0?0:(idx+1)%schedule.length}
 function latestSetFor(ex,key=currentProfileKey){const id=Array.isArray(ex)?stableExerciseId(ex):ex;return setEntries(key).find(e=>e.exerciseId===id)}
 function decisionClass(d){return d==="increase"?"increase":d==="reduce"?"reduce":d==="rest"?"rest":d==="complete"?"complete":"repeat"}
 
@@ -195,15 +211,16 @@ function fillDaySelect(preferredDay=""){
   if(!qs("log-day")) return;
   fillProfileSelects();
   const sched=activeSchedule(currentProfileKey);
-  qs("log-day").innerHTML=sched.map(d=>`<option value="${escapeAttr(d.day)}">${escapeHtml(d.day)} — ${escapeHtml(d.title)}</option>`).join("");
-  qs("log-day").value=sched.some(d=>d.day===preferredDay)?preferredDay:sched[nextDayIndex(currentProfileKey)].day;
+  qs("log-day").innerHTML=sched.map(d=>`<option value="${escapeAttr(d.id)}">${escapeHtml(d.day)} — ${escapeHtml(d.title)}</option>`).join("");
+  const preferred=sched.find(d=>d.id===preferredDay||d.day===preferredDay);
+  qs("log-day").value=preferred?.id||sched[nextDayIndex(currentProfileKey)].id;
   fillExercisesForDay();
 }
 // Only sets newer than this day's latest completion belong to the current loop.
 // This prevents an old workout from shifting the first exercise of a new loop.
-function dayEntries(day,key=currentProfileKey){const completion=completedEntries(key).find(e=>e.day===day);return setEntries(key).filter(e=>e.day===day&&(!completion||e.created>completion.created))}
-function lastLoggedExerciseForDay(day,key=currentProfileKey){const dayLog=dayEntries(day,key);return dayLog.length?dayLog[0].exerciseId:null}
-function nextExerciseForDay(day,key=currentProfileKey){const d=scheduleByDay(day,key);const last=lastLoggedExerciseForDay(day,key);if(!last) return stableExerciseId(d.exs[0]);const idx=d.exs.findIndex(e=>stableExerciseId(e)===last);return stableExerciseId(d.exs[(idx+1+d.exs.length)%d.exs.length])}
+function dayEntries(dayRef,key=currentProfileKey){const d=scheduleByDay(dayRef,key);const matches=e=>e.dayId===d.id||(!e.dayId&&e.day===d.day);const completion=completedEntries(key).find(matches);return setEntries(key).filter(e=>matches(e)&&(!completion||e.created>completion.created))}
+function lastLoggedExerciseForDay(dayRef,key=currentProfileKey){const dayLog=dayEntries(dayRef,key);return dayLog.length?dayLog[0].exerciseId:null}
+function nextExerciseForDay(dayRef,key=currentProfileKey){const d=scheduleByDay(dayRef,key);const last=lastLoggedExerciseForDay(dayRef,key);if(!last) return stableExerciseId(d.exs[0]);const idx=d.exs.findIndex(e=>stableExerciseId(e)===last);return stableExerciseId(d.exs[(idx+1+d.exs.length)%d.exs.length])}
 function renderLogPreview(){const exercise=selectedExercise(); if(!exercise) return; const last=latestSetFor(exercise); if(!last){qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${escapeHtml(exercise[0])}</strong>. No recent work set yet.</div>`; return;} qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${escapeHtml(exercise[0])}</strong>. Last work set ${escapeHtml(last.load??"—")} kg, ${escapeHtml(last.s1)}${last.s2?"/"+escapeHtml(last.s2):""} reps, ${escapeHtml(last.decision)}.</div>`}
 function fillExercisesForDay(){
   const d=scheduleByDay(qs("log-day").value,currentProfileKey);
@@ -232,29 +249,31 @@ async function insertRow(row){
   setSync("ok","Synced"); await loadAllData(false); return true;
 }
 async function addEntry(){
-  const day=qs("log-day").value, exercise=selectedExercise(), ex=exercise?.[0], exerciseId=stableExerciseId(exercise), setType=qs("log-set-type").value, load=parseFloat(qs("log-load").value), s1=parseInt(qs("log-s1").value), s2=parseInt(qs("log-s2").value)||0, rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
-  if(isNaN(load)||!s1||(setType==="work"&&isNaN(rir))){toast(setType==="work"?"Fill load, set 1, and RIR":"Fill load and set 1");return}
-  const dec=setType==="warmup"?{decision:"warmup",label:"Warm-up saved",reason:"Warm-up sets do not affect progression or records.",cls:"repeat"}:decide(s1,s2,rir,range); const d=scheduleByDay(day);
-  const ok=await insertRow({entry_date:localDateKey(),loop_day:day,workout_title:d.title,exercise:ex,exercise_id:exerciseId,set_type:setType,load_kg:load,set_1_reps:s1,set_2_reps:s2||null,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,is_rest_day:false});
+  const dayRef=qs("log-day").value, exercise=selectedExercise(), ex=exercise?.[0], exerciseId=stableExerciseId(exercise), setType=qs("log-set-type").value, load=parseFloat(qs("log-load").value), s1=parseInt(qs("log-s1").value), s2=parseInt(qs("log-s2").value)||0, rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
+  const required=["log-load","log-s1",...(setType==="work"?["log-rir"]:[])];
+  const invalid=required.find(id=>!qs(id).value||!qs(id).checkValidity());
+  if(!exercise||!["work","warmup"].includes(setType)||invalid||!Number.isFinite(load)||!Number.isInteger(s1)||(setType==="work"&&!Number.isInteger(rir))){if(invalid)qs(invalid).reportValidity();toast("Check the set values");return}
+  const dec=setType==="warmup"?{decision:"warmup",label:"Warm-up saved",reason:"Warm-up sets do not affect progression or records.",cls:"repeat"}:decide(s1,s2,rir,range); const d=scheduleByDay(dayRef);
+  const ok=await insertRow({entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:ex,exercise_id:exerciseId,set_type:setType,load_kg:load,set_1_reps:s1,set_2_reps:s2||null,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,is_rest_day:false});
   if(ok){
     qs("decision").classList.add("show");
     qs("decision-main").innerHTML=`<span class="badge ${dec.cls}">${dec.label}</span>`;
     qs("decision-reason").textContent=dec.reason;
     toast("Set saved");
     startRestTimer(setType==="warmup"?60:120);
-    if(setType==="work")qs("log-ex").value=nextExerciseForDay(day,currentProfileKey);
+    if(setType==="work")qs("log-ex").value=nextExerciseForDay(dayRef,currentProfileKey);
     clearForm();
   }
 }
 async function markWorkoutComplete(){
-  const day=qs("log-day").value, d=scheduleByDay(day);
-  const ok=await insertRow({entry_date:localDateKey(),loop_day:day,workout_title:d.title,exercise:COMPLETE_EX,decision:"complete",notes:"Workout completed",is_rest_day:false});
-  if(ok){toast(`${activeProfile().name}: ${day} completed`); fillDaySelect(); showPage("dashboard")}
+  const dayRef=qs("log-day").value, d=scheduleByDay(dayRef);
+  const ok=await insertRow({entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:COMPLETE_EX,exercise_id:null,decision:"complete",notes:"Workout completed",is_rest_day:false});
+  if(ok){toast(`${activeProfile().name}: ${d.day} completed`); fillDaySelect(); showPage("dashboard")}
 }
-async function markWorkoutCompleteFromDashboard(){const n=activeSchedule()[nextDayIndex()]; qs("log-day").value=n.day; await markWorkoutComplete()}
+async function markWorkoutCompleteFromDashboard(){const n=activeSchedule()[nextDayIndex()]; qs("log-day").value=n.id; await markWorkoutComplete()}
 async function logRestDay(){
   const n=activeSchedule()[nextDayIndex()];
-  const ok=await insertRow({entry_date:localDateKey(),loop_day:n.day,workout_title:"Rest day",exercise:"Rest day",decision:"rest",notes:"Recovery day",is_rest_day:true});
+  const ok=await insertRow({entry_date:localDateKey(),loop_day:n.day,schedule_day_id:n.id,workout_title:"Rest day",exercise:"Rest day",exercise_id:null,decision:"rest",notes:"Recovery day",is_rest_day:true});
   if(ok) toast("Rest day logged");
 }
 async function deleteEntry(id){ if(!confirm("Move this entry to trash?"))return; const {error}=await supabaseClient.from("workout_entries").update({deleted_at:new Date().toISOString()}).eq("id",id).eq("user_id",user.id); if(error){reportError("Could not move workout entry",error);return} lastDeletedId=id;qs("undo-bar").hidden=false;await loadAllData(false);toast("Moved to trash") }
@@ -269,6 +288,8 @@ function startRestTimer(seconds){stopRestTimer();timerEndsAt=Date.now()+seconds*
 function todayCheckin(){return checkins.find(item=>item.profile===currentProfileKey&&item.date===localDateKey())}
 function renderCheckin(){const item=todayCheckin();qs("checkin-date").textContent=localDateKey();qs("checkin-weight").value=item?.weight??"";qs("checkin-sleep").value=item?.sleep??"";qs("checkin-readiness").value=item?.readiness??"";qs("checkin-pain").value=item?.pain??""}
 async function saveCheckin(){
+  const invalid=["checkin-weight","checkin-sleep","checkin-readiness","checkin-pain"].find(id=>!qs(id).checkValidity());
+  if(invalid){qs(invalid).reportValidity();return}
   const numeric=(id)=>qs(id).value===""?null:Number(qs(id).value);
   const row={user_id:user.id,profile_key:currentProfileKey,entry_date:localDateKey(),body_weight_kg:numeric("checkin-weight"),sleep_hours:numeric("checkin-sleep"),readiness:numeric("checkin-readiness"),pain_notes:qs("checkin-pain").value.trim(),updated_at:new Date().toISOString()};
   const {error}=await supabaseClient.from("daily_checkins").upsert(row,{onConflict:"user_id,profile_key,entry_date"});
@@ -358,7 +379,7 @@ function loadEditorForProfile(key){
   editorProfileKey=key;
   const st=activeSettings(key); qs("edit-expected").value=st.expected_sessions_per_week;
   qs("edit-profile-tag").textContent=profileByKey(key).name;
-  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label>Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}"></div><div class="field"><label>Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}"></div><div class="field"><label>Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}"></div></div><div class="field" style="margin-top:10px"><label>Exercises — name | sets | reps | note | stable ID | aliases</label><textarea id="ed-exs-${idx}">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", ")].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
+  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label for="ed-day-${idx}">Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}" maxlength="80"></div><div class="field"><label for="ed-title-${idx}">Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}" maxlength="120"></div><div class="field"><label for="ed-focus-${idx}">Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}" maxlength="120"></div></div><div class="field" style="margin-top:10px"><label for="ed-exs-${idx}">Exercises — name | sets | reps | note | stable ID | aliases</label><textarea id="ed-exs-${idx}" maxlength="20000">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", ")].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
 }
 function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||"",parts[4]||slugifyExercise(parts[0]),parts[5]?parts[5].split(",").map(x=>x.trim()).filter(Boolean):[]]})}
 async function saveEditedSchedule(){
@@ -380,20 +401,30 @@ async function resetEditedSchedule(){
   }catch(error){reportError("Could not reset schedule",error)}
 }
 function exportBackup(){
-  const data={schema_version:2,exported_at:new Date().toISOString(),profiles:profileSettings,entries:allEntries,checkins};
+  const profiles=Object.fromEntries(Object.entries(profileSettings).map(([key,item])=>[key,{profile_key:item.profile_key,display_name:item.display_name,expected_sessions_per_week:item.expected_sessions_per_week,schedule_json:item.schedule_json}]));
+  const data={schema_version:3,exported_at:new Date().toISOString(),profiles,entries:allEntries,checkins};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="divinity-backup.json"; a.click(); URL.revokeObjectURL(url);
 }
 function chooseImport(){qs("import-file").click()}
-function entryToRow(entry){const row={user_id:user.id,profile_key:entry.profile||"alfred",profile_name:profileByKey(entry.profile).name,entry_date:entry.date,loop_day:entry.day,workout_title:entry.title,exercise:entry.ex,exercise_id:entry.exerciseId||slugifyExercise(entry.ex),load_kg:entry.load,set_1_reps:entry.s1||null,set_2_reps:entry.s2||null,rir:entry.rir,rep_range:entry.range,decision:entry.decision,notes:entry.notes||"",is_rest_day:!!entry.isRest,set_type:entry.setType||"work",deleted_at:entry.deletedAt||null,created_at:entry.created||undefined};if(isUuid(entry.id))row.id=entry.id;return row}
+function validDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(String(value||""))&&!Number.isNaN(Date.parse(`${value}T00:00:00Z`))}
+function boundedNumber(value,min,max,nullable=true){if(value==null||value===""){if(nullable)return null;throw new Error("A required number is missing.");}const number=Number(value);if(!Number.isFinite(number)||number<min||number>max)throw new Error(`Number must be between ${min} and ${max}.`);return number}
+function validProfileKey(value){return PROFILES.some(profile=>profile.key===value)}
+function entryToRow(entry){
+  if(!entry||!validProfileKey(entry.profile)||!validDate(entry.date)||!String(entry.ex||"").trim())throw new Error("Backup contains an invalid workout entry.");
+  const d=scheduleByDay(entry.dayId||entry.day,entry.profile),isRest=!!entry.isRest,isComplete=entry.ex===COMPLETE_EX,setType=["work","warmup"].includes(entry.setType)?entry.setType:"work";
+  const row={user_id:user.id,profile_key:entry.profile,profile_name:profileByKey(entry.profile).name,entry_date:entry.date,loop_day:String(entry.day||d.day).slice(0,80),schedule_day_id:String(entry.dayId||d.id).slice(0,80),workout_title:String(entry.title||d.title).slice(0,120),exercise:String(entry.ex).slice(0,160),exercise_id:isRest||isComplete?null:String(entry.exerciseId||slugifyExercise(entry.ex)).slice(0,80),load_kg:isRest||isComplete?null:boundedNumber(entry.load,0,2000),set_1_reps:isRest||isComplete?null:boundedNumber(entry.s1,1,50),set_2_reps:entry.s2?boundedNumber(entry.s2,1,50):null,rir:entry.rir==null?null:boundedNumber(entry.rir,0,5),rep_range:normalizeRange(entry.range)||null,decision:String(entry.decision||"").slice(0,80),notes:String(entry.notes||"").slice(0,2000),is_rest_day:isRest,set_type:setType,deleted_at:entry.deletedAt||null,created_at:entry.created||undefined};
+  if(isUuid(entry.id))row.id=entry.id;
+  return row;
+}
 async function importBackup(file){
   try{
     const data=validateBackup(JSON.parse(await file.text()));
     if(!confirm(`Import ${(data.entries||[]).length} entries and ${(data.checkins||[]).length} check-ins? Existing matching records will be updated.`))return;
-    const profiles=Object.values(data.profiles||{}).filter(item=>item?.profile_key&&PROFILES.some(p=>p.key===item.profile_key)).map(item=>({user_id:user.id,profile_key:item.profile_key,display_name:String(item.display_name||profileByKey(item.profile_key).name),expected_sessions_per_week:Number(item.expected_sessions_per_week)||0,schedule_json:Array.isArray(item.schedule_json)?item.schedule_json:profileByKey(item.profile_key).defaultSchedule}));
+    const profiles=Object.values(data.profiles||{}).filter(item=>item?.profile_key&&validProfileKey(item.profile_key)).map(item=>({user_id:user.id,profile_key:item.profile_key,display_name:String(item.display_name||profileByKey(item.profile_key).name).slice(0,120),expected_sessions_per_week:boundedNumber(item.expected_sessions_per_week,0,14,false),schedule_json:normalizeSchedule(item.schedule_json)}));
     if(profiles.length){const {error}=await supabaseClient.from("profile_settings").upsert(profiles,{onConflict:"user_id,profile_key"});if(error)throw error}
-    const rows=(data.entries||[]).filter(item=>item?.ex&&item?.date).map(entryToRow);for(let index=0;index<rows.length;index+=100){const {error}=await supabaseClient.from("workout_entries").upsert(rows.slice(index,index+100),{onConflict:"id"});if(error)throw error}
-    const importedCheckins=(data.checkins||[]).filter(item=>item?.date).map(item=>({user_id:user.id,profile_key:item.profile||"alfred",entry_date:item.date,body_weight_kg:item.weight??null,sleep_hours:item.sleep??null,readiness:item.readiness??null,pain_notes:String(item.pain||"").slice(0,1000)}));if(importedCheckins.length){const {error}=await supabaseClient.from("daily_checkins").upsert(importedCheckins,{onConflict:"user_id,profile_key,entry_date"});if(error)throw error}
+    const rows=(data.entries||[]).map(entryToRow);for(let index=0;index<rows.length;index+=100){const {error}=await supabaseClient.from("workout_entries").upsert(rows.slice(index,index+100),{onConflict:"id"});if(error)throw error}
+    const importedCheckins=(data.checkins||[]).map(item=>{if(!item||!validProfileKey(item.profile)||!validDate(item.date))throw new Error("Backup contains an invalid check-in.");return {user_id:user.id,profile_key:item.profile,entry_date:item.date,body_weight_kg:boundedNumber(item.weight,20,400),sleep_hours:boundedNumber(item.sleep,0,24),readiness:boundedNumber(item.readiness,1,5),pain_notes:String(item.pain||"").slice(0,1000)}});if(importedCheckins.length){const {error}=await supabaseClient.from("daily_checkins").upsert(importedCheckins,{onConflict:"user_id,profile_key,entry_date"});if(error)throw error}
     await loadAllData(false);toast("Backup imported")
   }catch(error){reportError("Could not import backup",error)}finally{qs("import-file").value=""}
 }
@@ -459,6 +490,7 @@ function bindEvents(){
   qs("edit-profile").addEventListener("change",event=>loadEditorForProfile(event.target.value));
   qs("progress-exercise").addEventListener("change",renderProgress);
   qs("import-file").addEventListener("change",event=>{const file=event.target.files?.[0];if(file)importBackup(file)});
+  document.addEventListener("keydown",event=>{if(event.key==="Escape"&&qs("profile-screen").classList.contains("show"))hideProfilePicker()});
 }
 
 function updateConnectionStatus(){qs("connection-banner").hidden=navigator.onLine}
