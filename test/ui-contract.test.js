@@ -57,6 +57,8 @@ test("workouts are logged one scheduled set at a time", () => {
   assert.match(app, /workout_session_id/);
   assert.match(app, /set_number/);
   assert.match(app, /scheduled_sets_snapshot/);
+  assert.match(app, /kg × \$\{slot\.entry\.s1\} reps/);
+  assert.match(app, /Target \$\{target\} reps/);
 });
 
 test("set logging survives reload and offline use", () => {
