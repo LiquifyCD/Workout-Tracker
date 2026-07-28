@@ -4,7 +4,7 @@
 const SUPABASE_URL = "https://txdiazrvochdrlmlahbo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_c2FUhLGrPLvD8w6dj74TCQ_xolv2TEy";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-const {decide,escapeAttr,escapeHtml,exerciseIdentity,isUuid,localDateKey,normalizeRange,normalizeSchedule,parseDecimal,personalRecord,progressSeries,rangeMidpoint,slugifyExercise,validateBackup}=DivinityCore;
+const {decide,escapeAttr,escapeHtml,estimatedOneRepMax,exerciseIdentity,isUuid,localDateKey,normalizeRange,normalizeSchedule,parseDecimal,personalRecord,progressSeries,rangeMidpoint,scheduledSetSlots,setVolume,slugifyExercise,strengthClassification,validateBackup}=DivinityCore;
 
 const PROFILES = globalThis.DIVINITY_PROFILES;
 const COMPLETE_EX = "__WORKOUT_COMPLETE__";
@@ -17,7 +17,6 @@ const NAV_ITEMS = [
 ];
 let entries = [];
 let allEntries = [];
-let checkins = [];
 let profileSettings = {};
 let user = null;
 let currentProfileKey = localStorage.getItem("divinity-profile") || "alfred";
@@ -27,15 +26,17 @@ let historyPage = 0;
 let lastDeletedId = null;
 let timerInterval = null;
 let timerEndsAt = 0;
+let editingEntryId = null;
 let deferredInstallPrompt = null;
 let waitingWorker = null;
 let toastTimer = null;
 let modalReturnFocus = null;
 const DATA_PAGE_SIZE = 500;
 const HISTORY_PAGE_SIZE = 50;
-const PROFILE_COLUMNS = "profile_key,display_name,expected_sessions_per_week,schedule_json";
-const WORKOUT_COLUMNS = "id,entry_date,profile_key,loop_day,schedule_day_id,workout_title,exercise,exercise_id,load_kg,set_1_reps,set_2_reps,rir,rep_range,decision,notes,is_rest_day,set_type,deleted_at,created_at";
-const CHECKIN_COLUMNS = "id,profile_key,entry_date,body_weight_kg,sleep_hours,readiness,pain_notes";
+const PROFILE_COLUMNS = "profile_key,display_name,expected_sessions_per_week,schedule_json,strength_sex,body_weight_kg";
+const WORKOUT_COLUMNS = "id,entry_date,profile_key,loop_day,schedule_day_id,workout_title,exercise,exercise_id,load_kg,set_1_reps,set_2_reps,rir,rep_range,decision,notes,is_rest_day,set_type,deleted_at,created_at,workout_session_id,set_number,scheduled_sets_snapshot,set_status";
+const PENDING_KEY = "divinity-pending-workout-entries-v1";
+const TIMER_KEY = "divinity-rest-timer-ends-at";
 
 function qs(id){return document.getElementById(id)}
 function profileByKey(key){return PROFILES.find(p=>p.key===key)||PROFILES[0]}
@@ -145,11 +146,12 @@ async function loadAllData(show=true){
     profileSettings={};
     settingsRows.forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r,schedule_json:normalizeSchedule(r.schedule_json)}});
     await ensureProfileSettings();
-    const [entryRows,checkinRows]=await Promise.all([loadWorkoutEntries(),loadCheckins()]);
-    allEntries=entryRows.map(mapWorkoutEntry);
+    await syncPendingEntries();
+    const entryRows=await loadWorkoutEntries();
+    const pendingRows=readPendingEntries().filter(row=>row.user_id===user.id);
+    allEntries=[...pendingRows,...entryRows].map(mapWorkoutEntry).sort((a,b)=>String(b.created).localeCompare(String(a.created)));
     entries=allEntries.filter(entry=>!entry.deletedAt);
-    checkins=checkinRows.map(r=>({id:r.id,profile:r.profile_key,date:r.entry_date,weight:r.body_weight_kg==null?null:Number(r.body_weight_kg),sleep:r.sleep_hours==null?null:Number(r.sleep_hours),readiness:r.readiness,pain:r.pain_notes||""}));
-    setSync("ok","Synced");
+    setSync(pendingRows.length?"":"ok",pendingRows.length?`${pendingRows.length} pending`:"Synced");
     renderAll();
   }catch(error){reportError("Sync failed",error)}
 }
@@ -164,14 +166,21 @@ async function loadWorkoutEntries(){
   }
 }
 
-async function loadCheckins(){
-  return queryData(await supabaseClient.from("daily_checkins").select(CHECKIN_COLUMNS).eq("user_id",user.id).order("entry_date",{ascending:false}),"Could not load daily check-ins");
+function readPendingEntries(){try{const value=JSON.parse(localStorage.getItem(PENDING_KEY)||"[]");return Array.isArray(value)?value:[]}catch{return []}}
+function writePendingEntries(rows){localStorage.setItem(PENDING_KEY,JSON.stringify(rows))}
+async function syncPendingEntries(){
+  if(!navigator.onLine||!user)return;
+  const rows=readPendingEntries().filter(row=>row.user_id===user.id);
+  if(!rows.length)return;
+  const {error}=await supabaseClient.from("workout_entries").upsert(rows,{onConflict:"id"});
+  if(error){console.warn("Pending workout entries remain queued",error);return}
+  writePendingEntries(readPendingEntries().filter(row=>row.user_id!==user.id));
 }
 
-function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,dayId:r.schedule_day_id||slugifyExercise(r.loop_day),title:r.workout_title,ex:r.exercise,exerciseId:stableEntryExerciseId(r.exercise,r.exercise_id),load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,setType:r.set_type||"work",deletedAt:r.deleted_at,created:r.created_at}}
+function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,dayId:r.schedule_day_id||slugifyExercise(r.loop_day),title:r.workout_title,ex:r.exercise,exerciseId:stableEntryExerciseId(r.exercise,r.exercise_id),load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,setType:r.set_type||"work",deletedAt:r.deleted_at,created:r.created_at,sessionId:r.workout_session_id||null,setNumber:r.set_number||null,scheduledSets:r.scheduled_sets_snapshot||null,status:r.set_status||"logged"}}
 async function upsertProfileSettings(row){
   const expectedSchedule=normalizeSchedule(row.schedule_json);
-  const {data,error}=await supabaseClient.from("profile_settings").upsert({...row,schedule_json:expectedSchedule},{onConflict:"user_id,profile_key"}).select("profile_key,display_name,expected_sessions_per_week,schedule_json").single();
+  const {data,error}=await supabaseClient.from("profile_settings").upsert({...row,schedule_json:expectedSchedule},{onConflict:"user_id,profile_key"}).select(PROFILE_COLUMNS).single();
   if(error)throw error;
   const persistedSchedule=normalizeSchedule(data.schedule_json);
   if(JSON.stringify(persistedSchedule)!==JSON.stringify(expectedSchedule))throw new Error("Saved schedule did not match the Supabase response.");
@@ -187,7 +196,7 @@ function switchProfile(key, close=false){
 }
 function profileEntries(key=currentProfileKey){return entries.filter(e=>e.profile===key)}
 function completedEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex===COMPLETE_EX&&!e.isRest)}
-function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest&&e.setType!=="warmup")}
+function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest&&e.setType!=="warmup"&&e.status!=="skipped")}
 function loggedSetEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest)}
 function scheduleByDay(dayRef,key=currentProfileKey){return activeSchedule(key).find(x=>x.id===dayRef||x.day===dayRef)||activeSchedule(key)[0]}
 // Completion rows are already newest-first, so advancing follows the configured
@@ -219,15 +228,40 @@ function fillDaySelect(preferredDay=""){
 }
 // Only sets newer than this day's latest completion belong to the current loop.
 // This prevents an old workout from shifting the first exercise of a new loop.
-function dayEntries(dayRef,key=currentProfileKey){const d=scheduleByDay(dayRef,key);const matches=e=>e.dayId===d.id||(!e.dayId&&e.day===d.day);const completion=completedEntries(key).find(matches);return setEntries(key).filter(e=>matches(e)&&(!completion||e.created>completion.created))}
-function lastLoggedExerciseForDay(dayRef,key=currentProfileKey){const dayLog=dayEntries(dayRef,key);return dayLog.length?dayLog[0].exerciseId:null}
-function nextExerciseForDay(dayRef,key=currentProfileKey){const d=scheduleByDay(dayRef,key);const last=lastLoggedExerciseForDay(dayRef,key);if(!last) return stableExerciseId(d.exs[0]);const idx=d.exs.findIndex(e=>stableExerciseId(e)===last);return stableExerciseId(d.exs[(idx+1+d.exs.length)%d.exs.length])}
-function renderLogPreview(){const exercise=selectedExercise(); if(!exercise) return; const last=latestSetFor(exercise); if(!last){qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${escapeHtml(exercise[0])}</strong>. No recent work set yet.</div>`; return;} qs("log-preview").innerHTML=`<div class="warnbox">Next exercise: <strong>${escapeHtml(exercise[0])}</strong>. Last work set ${escapeHtml(last.load??"—")} kg, ${escapeHtml(last.s1)}${last.s2?"/"+escapeHtml(last.s2):""} reps, ${escapeHtml(last.decision)}.</div>`}
+function sessionStorageKey(dayRef,key=currentProfileKey){return `divinity-session:${key}:${scheduleByDay(dayRef,key).id}`}
+function sessionIdForDay(dayRef,key=currentProfileKey,create=false){
+  const storageKey=sessionStorageKey(dayRef,key);
+  const stored=localStorage.getItem(storageKey);
+  if(stored)return stored;
+  const d=scheduleByDay(dayRef,key),completion=completedEntries(key).find(e=>e.dayId===d.id||e.day===d.day);
+  const recent=profileEntries(key).find(e=>e.sessionId&&(e.dayId===d.id||e.day===d.day)&&(!completion||e.created>completion.created));
+  if(recent){localStorage.setItem(storageKey,recent.sessionId);return recent.sessionId}
+  if(!create)return null;
+  const created=crypto.randomUUID();localStorage.setItem(storageKey,created);return created;
+}
+function sessionEntries(dayRef,key=currentProfileKey){
+  const id=sessionIdForDay(dayRef,key);
+  return id?profileEntries(key).filter(e=>e.sessionId===id&&e.ex!==COMPLETE_EX&&!e.isRest&&e.setType!=="warmup"):[];
+}
+function workoutPlan(dayRef=qs("log-day").value,key=currentProfileKey){
+  const day=scheduleByDay(dayRef,key),logged=sessionEntries(dayRef,key);
+  return scheduledSetSlots(day,logged).map(slot=>({...slot,day}));
+}
+function currentPlannedSlot(dayRef=qs("log-day").value,key=currentProfileKey){return workoutPlan(dayRef,key).find(slot=>!slot.entry)||null}
+function plannedSlotForExercise(exerciseId,dayRef=qs("log-day").value,key=currentProfileKey){return workoutPlan(dayRef,key).find(slot=>slot.exerciseId===exerciseId&&!slot.entry)||null}
+function nextExerciseForDay(dayRef,key=currentProfileKey){return currentPlannedSlot(dayRef,key)?.exerciseId||stableExerciseId(scheduleByDay(dayRef,key).exs[0])}
+function renderWorkoutPlan(){
+  const slots=workoutPlan(),current=currentPlannedSlot();
+  qs("workout-plan").innerHTML=`<div class="card pad"><div class="set-plan-head"><div><strong>${escapeHtml(scheduleByDay(qs("log-day").value).title)}</strong><div class="meta">${current?`Current: ${escapeHtml(current.exercise[0])}, set ${current.number} of ${current.total}`:"All scheduled sets handled"}</div></div><span class="tag purple">${slots.filter(slot=>slot.entry).length}/${slots.length}</span></div><div class="set-plan-list">${slots.map(slot=>`<button class="set-chip ${slot.entry?slot.entry.status==="skipped"?"skipped":"complete":current===slot?"current":""}" data-plan-exercise="${escapeAttr(slot.exerciseId)}" ${slot.entry?"disabled":""}><span>${escapeHtml(slot.exercise[0])}</span><small>Set ${slot.number}/${slot.total}${slot.optional?" · optional":""}${slot.entry?.status==="skipped"?" · skipped":slot.entry?" · done":""}</small></button>`).join("")}</div></div>`;
+}
+function renderLogPreview(){const exercise=selectedExercise(); if(!exercise) return; const slot=plannedSlotForExercise(stableExerciseId(exercise)),last=latestSetFor(exercise); const prefix=slot?`Scheduled set ${slot.number} of ${slot.total}. `:"No remaining scheduled sets. "; if(!last){qs("log-preview").innerHTML=`<div class="warnbox"><strong>${escapeHtml(exercise[0])}</strong>. ${prefix}No recent work set yet.</div>`; return;} qs("log-preview").innerHTML=`<div class="warnbox"><strong>${escapeHtml(exercise[0])}</strong>. ${prefix}Last work set ${escapeHtml(last.load??"—")} kg × ${escapeHtml(last.s1)} reps, ${escapeHtml(last.decision)}.</div>`}
 function fillExercisesForDay(){
   const d=scheduleByDay(qs("log-day").value,currentProfileKey);
   qs("log-ex").innerHTML=d.exs.map(e=>`<option value="${escapeAttr(stableExerciseId(e))}">${escapeHtml(e[0])}</option>`).join("");
   qs("log-ex").value=nextExerciseForDay(qs("log-day").value,currentProfileKey);
   setExerciseDefaults();
+  renderWorkoutPlan();
+  restoreLogDraft();
 }
 function setExerciseDefaults(){
   const range=rangeForExercise();
@@ -236,40 +270,68 @@ function setExerciseDefaults(){
   const last=latestSetFor(qs("log-ex").value),midpoint=rangeMidpoint(range);
   qs("log-load").value=last?.load??"";
   qs("log-s1").value=last?.s1||midpoint;
-  qs("log-s2").value=last?.s2||midpoint;
   renderLogPreview();
 }
-function clearForm(){["log-rir","log-notes"].forEach(id=>qs(id).value="");qs("decision").classList.remove("show");setExerciseDefaults()}
+function clearForm(){["log-rir","log-notes"].forEach(id=>qs(id).value="");qs("decision").classList.remove("show");if(!editingEntryId)setExerciseDefaults();saveLogDraft()}
+function cancelEdit(){editingEntryId=null;qs("cancel-edit").hidden=true;document.querySelector('[data-action="add-entry"]').textContent="Save set";clearForm();fillExercisesForDay()}
 
 async function insertRow(row){
   user = user || await getUser();
   if(!user){setLoginVisible(true);toast("Sign in first");return false}
+  const stored={id:crypto.randomUUID(),...row,user_id:user.id,profile_key:currentProfileKey,profile_name:activeProfile().name,created_at:new Date().toISOString()};
+  if(!navigator.onLine){
+    writePendingEntries([stored,...readPendingEntries()]);
+    allEntries.unshift(mapWorkoutEntry(stored));entries=allEntries.filter(entry=>!entry.deletedAt);renderAll();setSync("","1 pending");return true;
+  }
   setSync("", "Saving");
-  const {error}=await supabaseClient.from("workout_entries").insert({...row,user_id:user.id,profile_key:currentProfileKey,profile_name:activeProfile().name});
-  if(error){reportError("Could not save workout entry",error);return false}
+  const {error}=await supabaseClient.from("workout_entries").insert(stored);
+  if(error){
+    if(error.message?.toLowerCase().includes("fetch")){writePendingEntries([stored,...readPendingEntries()]);allEntries.unshift(mapWorkoutEntry(stored));entries=allEntries.filter(entry=>!entry.deletedAt);renderAll();setSync("","1 pending");return true}
+    reportError("Could not save workout entry",error);return false
+  }
   setSync("ok","Synced"); await loadAllData(false); return true;
 }
 async function addEntry(){
-  const dayRef=qs("log-day").value, exercise=selectedExercise(), ex=exercise?.[0], exerciseId=stableExerciseId(exercise), setType=qs("log-set-type").value, load=parseDecimal(qs("log-load").value), s1=parseInt(qs("log-s1").value), s2=parseInt(qs("log-s2").value)||0, rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
+  const dayRef=qs("log-day").value, exercise=selectedExercise(), ex=exercise?.[0], exerciseId=stableExerciseId(exercise), setType=qs("log-set-type").value, load=parseDecimal(qs("log-load").value), s1=parseInt(qs("log-s1").value), rir=parseInt(qs("log-rir").value), range=qs("log-range").value, notes=qs("log-notes").value.trim();
   const required=["log-load","log-s1",...(setType==="work"?["log-rir"]:[])];
   const invalid=required.find(id=>!qs(id).value||!qs(id).checkValidity());
   if(!exercise||!["work","warmup"].includes(setType)||invalid||!Number.isFinite(load)||!Number.isInteger(s1)||(setType==="work"&&!Number.isInteger(rir))){if(invalid)qs(invalid).reportValidity();toast("Check the set values");return}
-  const dec=setType==="warmup"?{decision:"warmup",label:"Warm-up saved",reason:"Warm-up sets do not affect progression or records.",cls:"repeat"}:decide(s1,s2,rir,range); const d=scheduleByDay(dayRef);
-  const ok=await insertRow({entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:ex,exercise_id:exerciseId,set_type:setType,load_kg:load,set_1_reps:s1,set_2_reps:s2||null,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,is_rest_day:false});
+  const dec=setType==="warmup"?{decision:"warmup",label:"Warm-up saved",reason:"Warm-up sets do not affect progression or records.",cls:"repeat"}:decide(s1,0,rir,range),d=scheduleByDay(dayRef),slot=setType==="work"?plannedSlotForExercise(exerciseId,dayRef):null;
+  const row={entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:ex,exercise_id:exerciseId,set_type:setType,load_kg:load,set_1_reps:s1,set_2_reps:null,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,is_rest_day:false,set_status:"logged",workout_session_id:setType==="work"?sessionIdForDay(dayRef,currentProfileKey,true):null,set_number:slot?.number||null,scheduled_sets_snapshot:slot?.total||null};
+  let ok;
+  if(editingEntryId){
+    if(!navigator.onLine){toast("Reconnect before editing an existing set","error");return}
+    const {error}=await supabaseClient.from("workout_entries").update({load_kg:load,set_1_reps:s1,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,set_type:setType,set_status:"logged"}).eq("id",editingEntryId).eq("user_id",user.id);
+    if(error){reportError("Could not update set",error);return}
+    ok=true;editingEntryId=null;qs("cancel-edit").hidden=true;document.querySelector('[data-action="add-entry"]').textContent="Save set";await loadAllData(false);
+  }else ok=await insertRow(row);
   if(ok){
     qs("decision").classList.add("show");
     qs("decision-main").innerHTML=`<span class="badge ${dec.cls}">${dec.label}</span>`;
     qs("decision-reason").textContent=dec.reason;
     toast("Set saved");
     startRestTimer(setType==="warmup"?60:120);
-    if(setType==="work")qs("log-ex").value=nextExerciseForDay(dayRef,currentProfileKey);
+    if(setType==="work")fillExercisesForDay();
     clearForm();
   }
 }
+async function skipSet(){
+  const dayRef=qs("log-day").value,slot=currentPlannedSlot(dayRef);
+  if(!slot){toast("All scheduled sets are already handled");return}
+  const ok=await insertRow({entry_date:localDateKey(),loop_day:slot.day.day,schedule_day_id:slot.day.id,workout_title:slot.day.title,exercise:slot.exercise[0],exercise_id:slot.exerciseId,set_type:"work",load_kg:null,set_1_reps:null,set_2_reps:null,rir:null,rep_range:normalizeRange(slot.exercise[2]),decision:"skipped",notes:"Scheduled set skipped",is_rest_day:false,set_status:"skipped",workout_session_id:sessionIdForDay(dayRef,currentProfileKey,true),set_number:slot.number,scheduled_sets_snapshot:slot.total});
+  if(ok){toast("Set skipped");fillExercisesForDay()}
+}
+function editEntry(id){
+  const entry=entries.find(item=>item.id===id);
+  if(!entry||entry.isRest||entry.ex===COMPLETE_EX||entry.status==="skipped")return;
+  editingEntryId=id;switchProfile(entry.profile);fillDaySelect(entry.dayId);qs("log-ex").value=entry.exerciseId;qs("log-load").value=entry.load??"";qs("log-s1").value=entry.s1||"";qs("log-rir").value=entry.rir??"";qs("log-notes").value=entry.notes||"";qs("log-set-type").value=entry.setType;qs("log-range").value=entry.range;qs("cancel-edit").hidden=false;document.querySelector('[data-action="add-entry"]').textContent="Update set";showPage("log");renderLogPreview()
+}
 async function markWorkoutComplete(){
   const dayRef=qs("log-day").value, d=scheduleByDay(dayRef);
-  const ok=await insertRow({entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:COMPLETE_EX,exercise_id:null,decision:"complete",notes:"Workout completed",is_rest_day:false});
-  if(ok){toast(`${activeProfile().name}: ${d.day} completed`); fillDaySelect(); showPage("dashboard")}
+  const remaining=workoutPlan(dayRef).filter(slot=>!slot.entry);
+  if(remaining.length&&!confirm(`Complete workout with ${remaining.length} scheduled set(s) still open?`))return;
+  const ok=await insertRow({entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:COMPLETE_EX,exercise_id:null,decision:"complete",notes:"Workout completed",is_rest_day:false,workout_session_id:sessionIdForDay(dayRef,currentProfileKey,true)});
+  if(ok){localStorage.removeItem(sessionStorageKey(dayRef));toast(`${activeProfile().name}: ${d.day} completed`); fillDaySelect(); showPage("dashboard")}
 }
 async function markWorkoutCompleteFromDashboard(){const n=activeSchedule()[nextDayIndex()]; qs("log-day").value=n.id; await markWorkoutComplete()}
 async function logRestDay(){
@@ -283,23 +345,14 @@ async function permanentlyDeleteEntry(id){if(!confirm("Permanently delete this e
 async function undoDelete(){if(lastDeletedId)await restoreEntry(lastDeletedId)}
 async function clearProfileData(){ if(!confirm(`Move ALL data for ${activeProfile().name} to trash?`))return; const {error}=await supabaseClient.from("workout_entries").update({deleted_at:new Date().toISOString()}).eq("user_id",user.id).eq("profile_key",currentProfileKey).is("deleted_at",null); if(error){reportError("Could not move profile data",error);return} await loadAllData(false); toast("Profile data moved to trash") }
 
-function stopRestTimer(){clearInterval(timerInterval);timerInterval=null;timerEndsAt=0;qs("timer-display").textContent="00:00"}
-function startRestTimer(seconds){stopRestTimer();timerEndsAt=Date.now()+seconds*1000;const tick=()=>{const left=Math.max(0,Math.ceil((timerEndsAt-Date.now())/1000));qs("timer-display").textContent=`${String(Math.floor(left/60)).padStart(2,"0")}:${String(left%60).padStart(2,"0")}`;if(!left){stopRestTimer();navigator.vibrate?.([150,100,150]);toast("Rest complete")}};tick();timerInterval=setInterval(tick,250)}
-
-function todayCheckin(){return checkins.find(item=>item.profile===currentProfileKey&&item.date===localDateKey())}
-function renderCheckin(){const item=todayCheckin();qs("checkin-date").textContent=localDateKey();qs("checkin-weight").value=item?.weight??"";qs("checkin-sleep").value=item?.sleep??"";qs("checkin-readiness").value=item?.readiness??"";qs("checkin-pain").value=item?.pain??""}
-async function saveCheckin(){
-  const invalid=["checkin-weight","checkin-sleep","checkin-readiness","checkin-pain"].find(id=>!qs(id).checkValidity());
-  if(invalid){qs(invalid).reportValidity();return}
-  const numeric=(id)=>qs(id).value===""?null:Number(qs(id).value);
-  const row={user_id:user.id,profile_key:currentProfileKey,entry_date:localDateKey(),body_weight_kg:numeric("checkin-weight"),sleep_hours:numeric("checkin-sleep"),readiness:numeric("checkin-readiness"),pain_notes:qs("checkin-pain").value.trim(),updated_at:new Date().toISOString()};
-  const {error}=await supabaseClient.from("daily_checkins").upsert(row,{onConflict:"user_id,profile_key,entry_date"});
-  if(error){reportError("Could not save daily check-in",error);return}await loadAllData(false);toast("Check-in saved")
-}
+function stopRestTimer(){clearInterval(timerInterval);timerInterval=null;timerEndsAt=0;localStorage.removeItem(TIMER_KEY);qs("timer-display").textContent="00:00"}
+function startRestTimer(seconds){clearInterval(timerInterval);timerEndsAt=Date.now()+seconds*1000;localStorage.setItem(TIMER_KEY,String(timerEndsAt));tickRestTimer();timerInterval=setInterval(tickRestTimer,250)}
+function tickRestTimer(){const left=Math.max(0,Math.ceil((timerEndsAt-Date.now())/1000));qs("timer-display").textContent=`${String(Math.floor(left/60)).padStart(2,"0")}:${String(left%60).padStart(2,"0")}`;if(!left&&timerEndsAt){stopRestTimer();navigator.vibrate?.([150,100,150]);toast("Rest complete")}}
+function restoreRestTimer(){const stored=Number(localStorage.getItem(TIMER_KEY));if(stored>Date.now()){timerEndsAt=stored;tickRestTimer();timerInterval=setInterval(tickRestTimer,250)}else localStorage.removeItem(TIMER_KEY)}
 
 function usageEstimate(){
-  const rows=allEntries.length+checkins.length+Object.keys(profileSettings).length;
-  const mb=(allEntries.length*3+checkins.length*2+Object.keys(profileSettings).length*12)/1024;
+  const rows=allEntries.length+Object.keys(profileSettings).length;
+  const mb=(allEntries.length*3+Object.keys(profileSettings).length*12)/1024;
   const pct=Math.min(100,(mb/500)*100);
   let level="ok", msg="Storage estimate is safe.";
   if(mb>350){level="warn";msg="Storage estimate is getting high. Export a backup and consider pruning old notes."}
@@ -323,7 +376,7 @@ function renderDashboard(){
   const recent=setEntries().slice(0,8); setEmptyState("recent-empty",recent.length>0); qs("recent-body").innerHTML=recent.map(rowHtml).join("");
   qs("log-profile-tag").textContent=activeProfile().name;
 }
-function rowHtml(e){return `<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td><span class="tag">${escapeHtml(e.day)}</span></td><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}${e.load!=null?" kg":""}</td><td class="mono">${escapeHtml(e.s1)}${e.s2?"/"+escapeHtml(e.s2):""}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`}
+function rowHtml(e){return `<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td><span class="tag">${escapeHtml(e.day)}</span></td><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}${e.load!=null?" kg":""}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`}
 function renderLoads(){
   const map={}; setEntries().forEach(e=>{if(!map[e.ex])map[e.ex]=e});
   const rows=Object.values(map); setEmptyState("loads-empty",rows.length>0);
@@ -340,8 +393,8 @@ function renderHistory(){
   historyPage=Math.min(historyPage,totalPages-1);
   const pageRows=rows.slice(historyPage*HISTORY_PAGE_SIZE,(historyPage+1)*HISTORY_PAGE_SIZE);
   setEmptyState("hist-empty",rows.length>0);
-  qs("hist-body").innerHTML=pageRows.map(e=>`<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td>${escapeHtml(e.day)}</td><td>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td class="mono">${escapeHtml(e.s2||"—")}</td><td class="mono">${escapeHtml(e.rir??"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td><td><button class="btn ghost small" data-delete-id="${escapeAttr(e.id)}">Del</button></td></tr>`).join("");
-  qs("hist-cards").innerHTML=pageRows.map(e=>`<div class="history-card"><div class="top"><div><h3>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</h3><div class="line">${escapeHtml(profileByKey(e.profile).name)} · ${escapeHtml(e.date)} · ${escapeHtml(e.day)} · ${escapeHtml(e.load??"—")}${e.load!=null?" kg":""} · reps ${escapeHtml(e.s1||"—")}${e.s2?"/"+escapeHtml(e.s2):""}</div><div class="line">${escapeHtml(e.notes||"")}</div></div><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></div><div class="btnrow" style="margin-top:10px"><button class="btn ghost" data-delete-id="${escapeAttr(e.id)}">Delete</button></div></div>`).join("");
+  qs("hist-body").innerHTML=pageRows.map(e=>`<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td>${escapeHtml(e.day)}</td><td>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</td><td class="mono">${escapeHtml(e.setNumber?`${e.setNumber}/${e.scheduledSets||"?"}`:"—")}</td><td class="mono">${escapeHtml(e.load??"—")}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td class="mono">${escapeHtml(e.rir??"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td><td><div class="btnrow">${e.ex!==COMPLETE_EX&&!e.isRest&&e.status!=="skipped"?`<button class="btn ghost small" data-edit-id="${escapeAttr(e.id)}">Edit</button>`:""}<button class="btn ghost small" data-delete-id="${escapeAttr(e.id)}">Del</button></div></td></tr>`).join("");
+  qs("hist-cards").innerHTML=pageRows.map(e=>`<div class="history-card"><div class="top"><div><h3>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</h3><div class="line">${escapeHtml(profileByKey(e.profile).name)} · ${escapeHtml(e.date)} · ${escapeHtml(e.day)}${e.setNumber?` · set ${escapeHtml(e.setNumber)}/${escapeHtml(e.scheduledSets||"?")}`:""} · ${escapeHtml(e.load??"—")}${e.load!=null?" kg":""} · reps ${escapeHtml(e.s1||"—")}</div><div class="line">${escapeHtml(e.notes||"")}</div></div><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></div><div class="btnrow" style="margin-top:10px">${e.ex!==COMPLETE_EX&&!e.isRest&&e.status!=="skipped"?`<button class="btn ghost" data-edit-id="${escapeAttr(e.id)}">Edit</button>`:""}<button class="btn ghost" data-delete-id="${escapeAttr(e.id)}">Delete</button></div></div>`).join("");
   qs("history-page").textContent=rows.length?`Page ${historyPage+1} of ${totalPages} · ${rows.length} entries`:"No entries";
   qs("history-prev").disabled=historyPage===0;
   qs("history-next").disabled=historyPage>=totalPages-1;
@@ -351,12 +404,36 @@ function renderProgress(){
   const select=qs("progress-exercise"),sets=setEntries(),catalog=new Map();sets.forEach(entry=>catalog.set(entry.exerciseId,entry.ex));
   const previous=select.value;select.innerHTML=[...catalog].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${escapeAttr(id)}">${escapeHtml(name)}</option>`).join("");
   if([...select.options].some(option=>option.value===previous))select.value=previous;
-  const id=select.value,series=progressSeries(sets,id),record=personalRecord(sets,id);
+  const id=select.value,series=progressSeries(sets,id),record=personalRecord(sets,id),metric=qs("progress-metric").value;
   qs("progress-pr").textContent=record?`${record.load} kg`:"—";qs("progress-pr-date").textContent=record?.date||"No work sets";
+  const metricRows=series.map(item=>({...item,volume:setVolume(item.load,item.s1),e1rm:estimatedOneRepMax(item.load,item.s1)}));
+  const bestE1rm=metricRows.reduce((best,item)=>Math.max(best,item.e1rm||0),0);
+  const recent=metricRows.slice(-5),prior=metricRows.slice(-10,-5),sum=(rows,key)=>rows.reduce((total,item)=>total+(item[key]||0),0),average=(rows,key)=>rows.length?sum(rows,key)/rows.length:0;
+  const recentVolume=sum(recent,"volume"),priorVolume=sum(prior,"volume"),recentE1rm=average(recent,"e1rm"),priorE1rm=average(prior,"e1rm");
+  const change=(current,previous)=>previous?`${current>=previous?"+":""}${Math.round(((current-previous)/previous)*100)}%`:"—";
+  qs("progress-e1rm").textContent=bestE1rm?`${bestE1rm.toFixed(1)} kg`:"—";
+  qs("progress-volume").textContent=recentVolume?`${Math.round(recentVolume)} kg`:"—";
+  qs("progress-volume-change").textContent=prior.length?`${change(recentVolume,priorVolume)} vs previous 5 sets`:"Need 10 work sets for comparison";
+  qs("progress-trend").textContent=prior.length?change(recentE1rm,priorE1rm):"—";
+  renderStrengthStandard(id,bestE1rm);
   if(!series.length){qs("progress-chart").innerHTML='<text x="300" y="95" text-anchor="middle">No progression data</text>';return}
-  const loads=series.map(item=>item.load),min=Math.min(...loads),max=Math.max(...loads),span=max-min||1;
-  const points=series.map((item,index)=>`${20+(index/Math.max(1,series.length-1))*560},${155-((item.load-min)/span)*125}`).join(" ");
+  const values=metricRows.map(item=>metric==="load"?item.load:metric==="reps"?item.s1:item[metric]),min=Math.min(...values),max=Math.max(...values),span=max-min||1;
+  const points=metricRows.map((item,index)=>`${20+(index/Math.max(1,metricRows.length-1))*560},${155-((values[index]-min)/span)*125}`).join(" ");
   qs("progress-chart").innerHTML=`<line x1="20" y1="155" x2="580" y2="155"/><polyline points="${points}"/><text x="20" y="175">${escapeHtml(series[0].date)}</text><text x="580" y="175" text-anchor="end">${escapeHtml(series.at(-1).date)}</text>`;
+}
+function renderStrengthStandard(exerciseId,bestE1rm){
+  const settings=activeSettings(),result=strengthClassification(exerciseId,settings.strength_sex,settings.body_weight_kg,bestE1rm);
+  qs("strength-sex").value=settings.strength_sex||"";
+  qs("strength-bodyweight").value=settings.body_weight_kg??"";
+  if(!result.supported){qs("strength-result").innerHTML=`<div class="warnbox">Unsupported comparison: ${escapeHtml(result.reason)} Use an exact supported barbell movement instead of treating machines or ambiguous variations as equivalent.</div>`;return}
+  if(!result.ready){qs("strength-result").innerHTML=`<div class="warnbox">${escapeHtml(result.reason)}</div>`;return}
+  const next=result.nextLevel?`Next: ${result.nextLevel} at ${result.nextThreshold}× body weight.`:"Highest displayed tier reached.";
+  qs("strength-result").innerHTML=`<div class="strength-level"><span class="badge increase">${escapeHtml(result.level)}</span><strong>${escapeHtml(result.label)} · ${result.ratio}× body weight</strong><p>${result.belowBeginner?"Below the published Beginner threshold. ":""}${escapeHtml(next)} Based on your best estimated 1RM, not a tested competition max.</p><a href="${escapeAttr(result.source)}" target="_blank" rel="noopener noreferrer">View source and method</a></div>`;
+}
+async function saveStrengthProfile(){
+  const sex=qs("strength-sex").value,bodyWeight=parseDecimal(qs("strength-bodyweight").value),settings=activeSettings();
+  if(!["male","female"].includes(sex)||!Number.isFinite(bodyWeight)||bodyWeight<20||bodyWeight>400){toast("Choose a reference and enter body weight between 20 and 400 kg","error");return}
+  try{await upsertProfileSettings({user_id:user.id,profile_key:currentProfileKey,display_name:activeProfile().name,expected_sessions_per_week:settings.expected_sessions_per_week,schedule_json:settings.schedule_json,strength_sex:sex,body_weight_kg:bodyWeight});await loadAllData(false);toast("Strength profile saved")}catch(error){reportError("Could not save strength profile",error)}
 }
 function renderTrash(){const rows=allEntries.filter(entry=>entry.deletedAt&&entry.profile===currentProfileKey);qs("trash-count").textContent=rows.length;qs("trash-list").innerHTML=rows.length?rows.slice(0,50).map(entry=>`<div class="warnbox"><b>${escapeHtml(entry.ex===COMPLETE_EX?"Workout complete":entry.ex)}</b> · ${escapeHtml(entry.date)}<div class="btnrow" style="margin-top:8px"><button class="btn small" data-restore-id="${escapeAttr(entry.id)}">Restore</button><button class="btn small bad" data-permanent-id="${escapeAttr(entry.id)}">Delete permanently</button></div></div>`).join(""):'<div class="empty"><p>Trash is empty.</p></div>'}
 function renderSchedule(){
@@ -402,8 +479,8 @@ async function resetEditedSchedule(){
   }catch(error){reportError("Could not reset schedule",error)}
 }
 function exportBackup(){
-  const profiles=Object.fromEntries(Object.entries(profileSettings).map(([key,item])=>[key,{profile_key:item.profile_key,display_name:item.display_name,expected_sessions_per_week:item.expected_sessions_per_week,schedule_json:item.schedule_json}]));
-  const data={schema_version:3,exported_at:new Date().toISOString(),profiles,entries:allEntries,checkins};
+  const profiles=Object.fromEntries(Object.entries(profileSettings).map(([key,item])=>[key,{profile_key:item.profile_key,display_name:item.display_name,expected_sessions_per_week:item.expected_sessions_per_week,schedule_json:item.schedule_json,strength_sex:item.strength_sex||null,body_weight_kg:item.body_weight_kg??null}]));
+  const data={schema_version:4,exported_at:new Date().toISOString(),profiles,entries:allEntries};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="divinity-backup.json"; a.click(); URL.revokeObjectURL(url);
 }
@@ -414,25 +491,25 @@ function validProfileKey(value){return PROFILES.some(profile=>profile.key===valu
 function entryToRow(entry){
   if(!entry||!validProfileKey(entry.profile)||!validDate(entry.date)||!String(entry.ex||"").trim())throw new Error("Backup contains an invalid workout entry.");
   const d=scheduleByDay(entry.dayId||entry.day,entry.profile),isRest=!!entry.isRest,isComplete=entry.ex===COMPLETE_EX,setType=["work","warmup"].includes(entry.setType)?entry.setType:"work";
-  const row={user_id:user.id,profile_key:entry.profile,profile_name:profileByKey(entry.profile).name,entry_date:entry.date,loop_day:String(entry.day||d.day).slice(0,80),schedule_day_id:String(entry.dayId||d.id).slice(0,80),workout_title:String(entry.title||d.title).slice(0,120),exercise:String(entry.ex).slice(0,160),exercise_id:isRest||isComplete?null:String(entry.exerciseId||slugifyExercise(entry.ex)).slice(0,80),load_kg:isRest||isComplete?null:boundedNumber(entry.load,0,2000),set_1_reps:isRest||isComplete?null:boundedNumber(entry.s1,1,50),set_2_reps:entry.s2?boundedNumber(entry.s2,1,50):null,rir:entry.rir==null?null:boundedNumber(entry.rir,0,5),rep_range:normalizeRange(entry.range)||null,decision:String(entry.decision||"").slice(0,80),notes:String(entry.notes||"").slice(0,2000),is_rest_day:isRest,set_type:setType,deleted_at:entry.deletedAt||null,created_at:entry.created||undefined};
+  const status=entry.status==="skipped"?"skipped":"logged";
+  const row={user_id:user.id,profile_key:entry.profile,profile_name:profileByKey(entry.profile).name,entry_date:entry.date,loop_day:String(entry.day||d.day).slice(0,80),schedule_day_id:String(entry.dayId||d.id).slice(0,80),workout_title:String(entry.title||d.title).slice(0,120),exercise:String(entry.ex).slice(0,160),exercise_id:isRest||isComplete?null:String(entry.exerciseId||slugifyExercise(entry.ex)).slice(0,80),load_kg:isRest||isComplete||status==="skipped"?null:boundedNumber(entry.load,0,2000),set_1_reps:isRest||isComplete||status==="skipped"?null:boundedNumber(entry.s1,1,50),set_2_reps:null,rir:entry.rir==null?null:boundedNumber(entry.rir,0,5),rep_range:normalizeRange(entry.range)||null,decision:String(entry.decision||"").slice(0,80),notes:String(entry.notes||"").slice(0,2000),is_rest_day:isRest,set_type:setType,deleted_at:entry.deletedAt||null,created_at:entry.created||undefined,workout_session_id:isUuid(entry.sessionId)?entry.sessionId:null,set_number:entry.setNumber==null?null:boundedNumber(entry.setNumber,1,50),scheduled_sets_snapshot:entry.scheduledSets==null?null:boundedNumber(entry.scheduledSets,1,50),set_status:status};
   if(isUuid(entry.id))row.id=entry.id;
   return row;
 }
 async function importBackup(file){
   try{
     const data=validateBackup(JSON.parse(await file.text()));
-    if(!confirm(`Import ${(data.entries||[]).length} entries and ${(data.checkins||[]).length} check-ins? Existing matching records will be updated.`))return;
-    const profiles=Object.values(data.profiles||{}).filter(item=>item?.profile_key&&validProfileKey(item.profile_key)).map(item=>({user_id:user.id,profile_key:item.profile_key,display_name:String(item.display_name||profileByKey(item.profile_key).name).slice(0,120),expected_sessions_per_week:boundedNumber(item.expected_sessions_per_week,0,14,false),schedule_json:normalizeSchedule(item.schedule_json)}));
+    if(!confirm(`Import ${(data.entries||[]).length} workout entries? Existing matching records will be updated. Legacy daily check-ins are intentionally ignored.`))return;
+    const profiles=Object.values(data.profiles||{}).filter(item=>item?.profile_key&&validProfileKey(item.profile_key)).map(item=>({user_id:user.id,profile_key:item.profile_key,display_name:String(item.display_name||profileByKey(item.profile_key).name).slice(0,120),expected_sessions_per_week:boundedNumber(item.expected_sessions_per_week,0,14,false),schedule_json:normalizeSchedule(item.schedule_json),strength_sex:["male","female"].includes(item.strength_sex)?item.strength_sex:null,body_weight_kg:boundedNumber(item.body_weight_kg,20,400)}));
     if(profiles.length){const {error}=await supabaseClient.from("profile_settings").upsert(profiles,{onConflict:"user_id,profile_key"});if(error)throw error}
     const rows=(data.entries||[]).map(entryToRow);for(let index=0;index<rows.length;index+=100){const {error}=await supabaseClient.from("workout_entries").upsert(rows.slice(index,index+100),{onConflict:"id"});if(error)throw error}
-    const importedCheckins=(data.checkins||[]).map(item=>{if(!item||!validProfileKey(item.profile)||!validDate(item.date))throw new Error("Backup contains an invalid check-in.");return {user_id:user.id,profile_key:item.profile,entry_date:item.date,body_weight_kg:boundedNumber(item.weight,20,400),sleep_hours:boundedNumber(item.sleep,0,24),readiness:boundedNumber(item.readiness,1,5),pain_notes:String(item.pain||"").slice(0,1000)}});if(importedCheckins.length){const {error}=await supabaseClient.from("daily_checkins").upsert(importedCheckins,{onConflict:"user_id,profile_key,entry_date"});if(error)throw error}
     await loadAllData(false);toast("Backup imported")
   }catch(error){reportError("Could not import backup",error)}finally{qs("import-file").value=""}
 }
 
 function renderAll(){
   if(!user) return;
-  renderProfilePicker(); fillProfileSelects(); fillDaySelect(); renderDashboard(); renderCheckin(); renderLoads(); renderHistory(); renderSchedule(); renderSettings(); if(qs("schedule-editor").innerHTML==="") loadEditorForProfile(editorProfileKey);
+  renderProfilePicker(); fillProfileSelects(); fillDaySelect(); renderDashboard(); renderLoads(); renderHistory(); renderSchedule(); renderSettings(); if(qs("schedule-editor").innerHTML==="") loadEditorForProfile(editorProfileKey);
 }
 function selectedExercise(day=qs("log-day").value,key=currentProfileKey){return scheduleByDay(day,key).exs.find(e=>stableExerciseId(e)===qs("log-ex").value)}
 function rangeForExercise(day=qs("log-day").value,key=currentProfileKey){const exercise=selectedExercise(day,key);return normalizeRange(exercise?.[2])||guessedRangeFor(exercise?.[0]||"")}
@@ -448,12 +525,14 @@ const ACTIONS = {
   "show-profile-picker":showProfilePicker,
   "refresh":loadAllData,
   "add-entry":addEntry,
+  "skip-set":skipSet,
+  "cancel-edit":cancelEdit,
   "complete-workout":markWorkoutComplete,
   "complete-dashboard-workout":markWorkoutCompleteFromDashboard,
   "log-rest-day":logRestDay,
   "clear-form":clearForm,
   "clear-profile-data":clearProfileData,
-  "save-checkin":saveCheckin,
+  "save-strength-profile":saveStrengthProfile,
   "stop-timer":stopRestTimer,
   "undo-delete":undoDelete,
   "save-schedule":saveEditedSchedule,
@@ -475,6 +554,8 @@ async function handleClick(event){
     if(button.dataset.filter){histFilter=button.dataset.filter;historyPage=0;renderHistory();return}
     if(button.dataset.timer){startRestTimer(Number(button.dataset.timer));return}
     if(button.dataset.deleteId){await deleteEntry(button.dataset.deleteId);return}
+    if(button.dataset.editId){editEntry(button.dataset.editId);return}
+    if(button.dataset.planExercise){qs("log-ex").value=button.dataset.planExercise;setExerciseDefaults();return}
     if(button.dataset.restoreId){await restoreEntry(button.dataset.restoreId);return}
     if(button.dataset.permanentId){await permanentlyDeleteEntry(button.dataset.permanentId);return}
     const action=ACTIONS[button.dataset.action];
@@ -490,11 +571,16 @@ function bindEvents(){
   qs("log-ex").addEventListener("change",setExerciseDefaults);
   qs("edit-profile").addEventListener("change",event=>loadEditorForProfile(event.target.value));
   qs("progress-exercise").addEventListener("change",renderProgress);
+  qs("progress-metric").addEventListener("change",renderProgress);
+  ["log-load","log-s1","log-rir","log-notes","log-set-type"].forEach(id=>qs(id).addEventListener("input",saveLogDraft));
   qs("import-file").addEventListener("change",event=>{const file=event.target.files?.[0];if(file)importBackup(file)});
   document.addEventListener("keydown",event=>{if(event.key==="Escape"&&qs("profile-screen").classList.contains("show"))hideProfilePicker()});
 }
 
-function updateConnectionStatus(){qs("connection-banner").hidden=navigator.onLine}
+function logDraftKey(){return `divinity-log-draft:${currentProfileKey}:${qs("log-day")?.value||"day"}`}
+function saveLogDraft(){if(!qs("log-day"))return;localStorage.setItem(logDraftKey(),JSON.stringify({exercise:qs("log-ex").value,load:qs("log-load").value,reps:qs("log-s1").value,rir:qs("log-rir").value,notes:qs("log-notes").value,setType:qs("log-set-type").value}))}
+function restoreLogDraft(){try{const draft=JSON.parse(localStorage.getItem(logDraftKey())||"null");if(!draft)return;if([...qs("log-ex").options].some(option=>option.value===draft.exercise))qs("log-ex").value=draft.exercise;qs("log-load").value=draft.load||qs("log-load").value;qs("log-s1").value=draft.reps||qs("log-s1").value;qs("log-rir").value=draft.rir||"";qs("log-notes").value=draft.notes||"";qs("log-set-type").value=draft.setType||"work";renderLogPreview()}catch{}}
+async function updateConnectionStatus(){qs("connection-banner").hidden=navigator.onLine;if(navigator.onLine&&user){await syncPendingEntries();await loadAllData(false)}}
 async function installApp(){if(!deferredInstallPrompt)return;await deferredInstallPrompt.prompt();deferredInstallPrompt=null;qs("install-app").hidden=true}
 function applyUpdate(){if(waitingWorker)waitingWorker.postMessage({type:"SKIP_WAITING"});else location.reload()}
 async function registerServiceWorker(){
@@ -508,7 +594,8 @@ async function registerServiceWorker(){
 renderNavigation();
 bindEvents();
 updateConnectionStatus();
-window.addEventListener("online",updateConnectionStatus);
+restoreRestTimer();
+window.addEventListener("online",()=>updateConnectionStatus().catch(error=>reportError("Could not sync pending sets",error)));
 window.addEventListener("offline",updateConnectionStatus);
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;qs("install-app").hidden=false});
 registerServiceWorker().catch(error=>console.error("Service worker registration failed",error));

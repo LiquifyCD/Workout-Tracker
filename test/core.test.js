@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { decide, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, parseDecimal, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup } = require("../core.js");
+const { decide, escapeHtml, estimatedOneRepMax, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, parseDecimal, parseSetPlan, personalRecord, progressSeries, rangeMidpoint, scheduledSetSlots, setVolume, slugifyExercise, strengthClassification, validateBackup } = require("../core.js");
 
 test("escapes stored HTML before rendering", () => {
   assert.equal(escapeHtml(`<img src=x onerror="alert(1)">'`), "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&#39;");
@@ -61,6 +61,35 @@ test("accepts decimal loads with a point or comma", () => {
   assert.equal(parseDecimal("72.25"), 72.25);
   assert.equal(parseDecimal("72,25"), 72.25);
   assert.equal(Number.isNaN(parseDecimal("72kg")), true);
+});
+
+test("turns schedule set ranges into deterministic set plans", () => {
+  assert.deepEqual(parseSetPlan("2"), { minimum: 2, maximum: 2, optional: false });
+  assert.deepEqual(parseSetPlan("1–2"), { minimum: 1, maximum: 2, optional: true });
+  assert.deepEqual(parseSetPlan("1 optional"), { minimum: 1, maximum: 1, optional: true });
+});
+
+test("programme changes affect future slots without rewriting logged snapshots", () => {
+  const entry = { exerciseId: "press", setNumber: 1, scheduledSets: 2, load: 80 };
+  const original = { exs: [["Press", "2", "6–10", "", "press"]] };
+  const changed = { exs: [["Renamed press", "3", "5–8", "", "press"]] };
+  assert.equal(scheduledSetSlots(original, [entry]).filter(slot => !slot.entry).length, 1);
+  assert.equal(scheduledSetSlots(changed, [entry]).filter(slot => !slot.entry).length, 2);
+  assert.deepEqual(entry, { exerciseId: "press", setNumber: 1, scheduledSets: 2, load: 80 });
+});
+
+test("calculates per-set volume and estimated 1RM", () => {
+  assert.equal(setVolume(80, 8), 640);
+  assert.equal(estimatedOneRepMax(80, 8), 101.3);
+  assert.equal(estimatedOneRepMax(80, 1), 80);
+});
+
+test("classifies supported lifts and explains unsupported ones", () => {
+  const result = strengthClassification("squat-variation", "female", 60, 75);
+  assert.equal(result.level, "Intermediate");
+  assert.equal(result.ratio, 1.25);
+  assert.equal(strengthClassification("leg-press-squat", "male", 80, 160).supported, false);
+  assert.equal(strengthClassification("incline-press", "", 80, 100).ready, false);
 });
 
 test("rejects unreasonably large backups", () => {

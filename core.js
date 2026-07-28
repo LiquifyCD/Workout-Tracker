@@ -31,6 +31,109 @@
     return Math.round((min + max) / 2);
   }
 
+  function parseSetPlan(value) {
+    const numbers = String(value || "").match(/\d+/g)?.map(Number) || [];
+    const minimum = numbers[0] || 1;
+    const maximum = numbers.length > 1 ? numbers.at(-1) : minimum;
+    return {
+      minimum,
+      maximum: Math.max(minimum, maximum),
+      optional: /optional/i.test(String(value || "")) || maximum > minimum
+    };
+  }
+
+  function scheduledSetSlots(day, entries = []) {
+    const slots = [];
+    for (const exercise of day?.exs || []) {
+      const exerciseId = exerciseIdentity(exercise);
+      const plan = parseSetPlan(exercise[1]);
+      const completed = entries
+        .filter(entry => entry.exerciseId === exerciseId)
+        .slice()
+        .sort((a, b) => (a.setNumber || 0) - (b.setNumber || 0));
+      for (let number = 1; number <= plan.maximum; number++) {
+        slots.push({
+          exercise,
+          exerciseId,
+          number,
+          total: plan.maximum,
+          optional: plan.optional && (plan.maximum === plan.minimum || number > plan.minimum),
+          entry: completed.find(item => item.setNumber === number) || completed[number - 1] || null
+        });
+      }
+    }
+    return slots;
+  }
+
+  function estimatedOneRepMax(load, reps) {
+    const weight = Number(load);
+    const repetitions = Number(reps);
+    if (!Number.isFinite(weight) || weight < 0 || !Number.isInteger(repetitions) || repetitions < 1) return null;
+    return Math.round((repetitions === 1 ? weight : weight * (1 + repetitions / 30)) * 10) / 10;
+  }
+
+  function setVolume(load, reps) {
+    const weight = Number(load);
+    const repetitions = Number(reps);
+    return Number.isFinite(weight) && Number.isInteger(repetitions) && repetitions > 0
+      ? Math.round(weight * repetitions * 10) / 10
+      : 0;
+  }
+
+  const STRENGTH_STANDARDS = {
+    "squat-variation": {
+      label: "Barbell squat",
+      source: "https://strengthlevel.com/strength-standards/squat",
+      male: [0.75, 1.25, 1.75, 2.25, 2.75],
+      female: [0.50, 0.75, 1.25, 1.75, 2.25]
+    },
+    "stiff-leg-deadlift": {
+      label: "Stiff-leg deadlift",
+      source: "https://strengthlevel.com/strength-standards/stiff-leg-deadlift",
+      male: [0.75, 1.00, 1.50, 2.00, 2.75],
+      female: [0.50, 0.75, 1.00, 1.50, 2.00]
+    },
+    "incline-press": {
+      label: "Incline bench press",
+      source: "https://strengthlevel.com/strength-standards/incline-bench-press/lb",
+      male: [0.50, 0.75, 1.00, 1.50, 1.75],
+      female: [0.25, 0.40, 0.65, 0.95, 1.25]
+    },
+    "overhead-press": {
+      label: "Shoulder press",
+      source: "https://strengthlevel.com/strength-standards/shoulder-press/lb",
+      male: [0.35, 0.55, 0.80, 1.05, 1.35],
+      female: [0.20, 0.35, 0.50, 0.70, 0.95]
+    }
+  };
+
+  function strengthClassification(exerciseId, sex, bodyWeight, oneRepMax) {
+    const standard = STRENGTH_STANDARDS[exerciseId];
+    if (!standard) return { supported: false, reason: "No like-for-like standard is available for this exercise." };
+    if (!["male", "female"].includes(sex)) return { supported: true, ready: false, reason: "Choose male or female reference data." };
+    const weight = Number(bodyWeight);
+    const max = Number(oneRepMax);
+    if (!Number.isFinite(weight) || weight <= 0) return { supported: true, ready: false, reason: "Add profile body weight to calculate a relative standard." };
+    if (!Number.isFinite(max) || max < 0) return { supported: true, ready: false, reason: "Log a work set to calculate estimated 1RM." };
+    const labels = ["Beginner", "Novice", "Intermediate", "Advanced", "Elite"];
+    const ratio = max / weight;
+    const thresholds = standard[sex];
+    let index = 0;
+    thresholds.forEach((threshold, candidate) => { if (ratio >= threshold) index = candidate; });
+    return {
+      supported: true,
+      ready: true,
+      label: standard.label,
+      level: labels[index],
+      ratio: Math.round(ratio * 100) / 100,
+      threshold: thresholds[index],
+      nextLevel: index < labels.length - 1 ? labels[index + 1] : null,
+      nextThreshold: index < labels.length - 1 ? thresholds[index + 1] : null,
+      belowBeginner: ratio < thresholds[0],
+      source: standard.source
+    };
+  }
+
   function decide(s1, s2, rir, range) {
     const normalized = normalizeRange(range);
     if (!normalized) throw new Error("Invalid rep range");
@@ -128,5 +231,5 @@
     });
   }
 
-  return { decide, escapeAttr: escapeHtml, escapeHtml, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, parseDecimal, personalRecord, progressSeries, rangeMidpoint, slugifyExercise, validateBackup };
+  return { decide, escapeAttr: escapeHtml, escapeHtml, estimatedOneRepMax, exerciseIdentity, isUuid, localDateKey, normalizeRange, normalizeSchedule, parseDecimal, parseSetPlan, personalRecord, progressSeries, rangeMidpoint, scheduledSetSlots, setVolume, slugifyExercise, strengthClassification, validateBackup };
 });

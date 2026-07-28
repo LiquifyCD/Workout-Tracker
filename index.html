@@ -76,17 +76,6 @@
 
       <div id="usage-alert" class="warnbox ok" style="display:none;margin-bottom:12px"></div>
 
-      <div class="section"><h2>Daily check-in</h2><span class="tag" id="checkin-date">Today</span></div>
-      <div class="card pad">
-        <div class="formgrid four">
-          <div class="field"><label for="checkin-weight">Body weight kg</label><input id="checkin-weight" type="number" min="20" max="400" step="0.1"></div>
-          <div class="field"><label for="checkin-sleep">Sleep hours</label><input id="checkin-sleep" type="number" min="0" max="24" step="0.25"></div>
-          <div class="field"><label for="checkin-readiness">Readiness</label><select id="checkin-readiness"><option value="">Not set</option><option value="1">1 — very low</option><option value="2">2 — low</option><option value="3">3 — normal</option><option value="4">4 — good</option><option value="5">5 — excellent</option></select></div>
-          <div class="field"><label for="checkin-pain">Pain / notes</label><input id="checkin-pain" type="text" maxlength="1000" placeholder="Optional"></div>
-        </div>
-        <div class="btnrow" style="margin-top:12px"><button class="btn primary" data-action="save-checkin">Save check-in</button></div>
-      </div>
-
       <div class="section"><h2>Next workout</h2><span class="tag purple" id="next-tag">Day 1</span></div>
       <div class="card" id="next-card"></div>
 
@@ -96,16 +85,16 @@
 
     <section id="page-log" class="page">
       <div class="section"><h2>Log set</h2><span class="tag purple" id="log-profile-tag">Profile</span></div>
+      <div id="workout-plan" class="set-plan" aria-live="polite"></div>
       <div class="card pad">
         <div class="formgrid">
           <div class="field"><label for="log-profile">Profile</label><select id="log-profile"></select></div>
           <div class="field"><label for="log-day">Loop day</label><select id="log-day"></select></div>
         </div>
         <div class="field" style="margin-top:12px"><label for="log-ex">Exercise</label><select id="log-ex"></select></div>
-        <div class="formgrid four" style="margin-top:12px">
+        <div class="formgrid three" style="margin-top:12px">
           <div class="field"><label for="log-load">Load kg</label><input id="log-load" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" maxlength="8" placeholder="60.25" aria-describedby="log-load-hint"><span id="log-load-hint" class="field-hint">Use a decimal point or comma.</span></div>
-          <div class="field"><label for="log-s1">Set 1 reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
-          <div class="field"><label for="log-s2">Set 2 reps</label><input id="log-s2" type="number" min="0" max="50" placeholder="5"></div>
+          <div class="field"><label for="log-s1">Reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
           <div class="field"><label for="log-rir">RIR</label><input id="log-rir" type="number" min="0" max="5" placeholder="1"></div>
         </div>
         <div class="formgrid" style="margin-top:12px">
@@ -113,7 +102,7 @@
           <div class="field"><label for="log-range">Rep target</label><select id="log-range"><option value="4-7">4–7 stable compounds</option><option value="6-10">6–10 isolations</option><option value="8-15">8–15 raises</option><option value="6-12">6–12 calves</option></select></div>
         </div>
         <div class="field" style="margin-top:12px"><label for="log-notes">Notes</label><input id="log-notes" type="text" maxlength="2000" placeholder="Form clean, slight fatigue..."></div>
-        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="add-entry">Save set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button></div>
+        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="add-entry">Save set</button><button class="btn" data-action="skip-set">Skip set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button><button id="cancel-edit" class="btn ghost" data-action="cancel-edit" hidden>Cancel edit</button></div>
         <div id="log-preview" style="margin-top:16px"></div>
         <div id="decision" class="decision"><h3>Next decision</h3><div id="decision-main"></div><p id="decision-reason"></p></div>
       </div>
@@ -126,11 +115,26 @@
     <section id="page-history" class="page">
       <div class="section"><h2>History</h2><button class="btn bad" data-action="clear-profile-data">Move profile data to trash</button></div>
       <div class="card pad">
-        <div class="formgrid"><div class="field"><label for="progress-exercise">Progress exercise</label><select id="progress-exercise"></select></div><div class="stat compact"><div class="label">Personal record</div><div class="value" id="progress-pr">—</div><div class="sub" id="progress-pr-date"></div></div></div>
+        <div class="formgrid three"><div class="field"><label for="progress-exercise">Progress exercise</label><select id="progress-exercise"></select></div><div class="field"><label for="progress-metric">Chart metric</label><select id="progress-metric"><option value="load">Weight</option><option value="reps">Reps</option><option value="volume">Volume</option><option value="e1rm">Estimated 1RM</option></select></div><div class="stat compact"><div class="label">Personal record</div><div class="value" id="progress-pr">—</div><div class="sub" id="progress-pr-date"></div></div></div>
+        <div class="progress-metrics">
+          <div class="stat compact"><div class="label">Best estimated 1RM</div><div class="value" id="progress-e1rm">—</div><div class="sub">Epley estimate</div></div>
+          <div class="stat compact"><div class="label">Recent volume</div><div class="value" id="progress-volume">—</div><div class="sub" id="progress-volume-change">Last 5 vs previous 5 sets</div></div>
+          <div class="stat compact"><div class="label">Recent performance</div><div class="value" id="progress-trend">—</div><div class="sub">Estimated 1RM change</div></div>
+        </div>
         <svg id="progress-chart" class="chart" viewBox="0 0 600 180" role="img" aria-label="Load progression chart"></svg>
       </div>
+      <div class="section"><div><h2>Strength standards</h2><p class="meta">Compares estimated 1RM with adult lifters at the same body weight.</p></div></div>
+      <div class="card pad">
+        <div class="formgrid three">
+          <div class="field"><label for="strength-sex">Reference</label><select id="strength-sex"><option value="">Choose</option><option value="male">Men</option><option value="female">Women</option></select></div>
+          <div class="field"><label for="strength-bodyweight">Profile body weight kg</label><input id="strength-bodyweight" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" maxlength="6" placeholder="75"></div>
+          <div class="field field-action"><button class="btn primary" data-action="save-strength-profile">Save profile values</button></div>
+        </div>
+        <div id="strength-result" class="strength-result" aria-live="polite"></div>
+        <p class="meta">Levels: Beginner, Novice, Intermediate, Advanced, Elite. Data: Strength Level community standards, checked 2026-07-28. Warm-ups are excluded. Unsupported machine or ambiguous variations are labelled explicitly.</p>
+      </div>
       <div class="filters" id="filters"></div>
-      <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>S1</th><th>S2</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
+      <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Set</th><th>Load</th><th>Reps</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
       <div class="stack" id="hist-cards"></div>
       <div class="section history-pagination"><button id="history-prev" class="btn ghost" data-action="history-prev">Previous</button><span id="history-page" class="meta" aria-live="polite"></span><button id="history-next" class="btn ghost" data-action="history-next">Next</button></div>
       <div class="section"><h2>Trash</h2><span class="tag" id="trash-count">0</span></div>

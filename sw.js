@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE = "divinity-v5";
+const CACHE = "divinity-v6";
 const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./data/programs.js", "./core.js", "./app.js",

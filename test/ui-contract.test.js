@@ -28,18 +28,52 @@ test("saved schedule changes refresh editable day controls", () => {
 });
 
 test("offline install does not depend on the external Supabase CDN", () => {
-  assert.match(serviceWorker, /const CACHE = "divinity-v5"/);
+  assert.match(serviceWorker, /const CACHE = "divinity-v6"/);
   const shell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\];/)?.[1] || "";
   assert.doesNotMatch(shell, /SUPABASE_CDN/);
   assert.match(serviceWorker, /event\.waitUntil\(caches\.open\(CACHE\)\.then\(cache => cache\.put/);
 });
 
 test("forms and modal status are accessible", () => {
-  for (const id of ["log-profile", "log-day", "log-ex", "log-load", "log-s1", "log-s2", "log-rir", "log-range", "log-notes", "edit-profile", "edit-expected"]) {
+  for (const id of ["log-profile", "log-day", "log-ex", "log-load", "log-s1", "log-rir", "log-range", "log-notes", "progress-exercise", "progress-metric", "strength-sex", "strength-bodyweight", "edit-profile", "edit-expected"]) {
     assert.match(html, new RegExp(`<label for="${id}">`));
   }
   assert.match(html, /id="auth-msg"[^>]+aria-live="polite"/);
   assert.match(app, /element\.inert=!!modal/);
+});
+
+test("daily body-weight check-in is removed without a destructive data migration", () => {
+  assert.doesNotMatch(html, /checkin-weight|Daily check-in/);
+  assert.doesNotMatch(app, /from\("daily_checkins"\)/);
+  assert.doesNotMatch(app, /body_weight_kg:numeric/);
+});
+
+test("workouts are logged one scheduled set at a time", () => {
+  assert.doesNotMatch(html, /id="log-s2"/);
+  assert.match(html, /id="workout-plan"/);
+  assert.match(app, /scheduledSetSlots\(day,logged\)/);
+  assert.match(app, /set_2_reps:null/);
+  assert.match(app, /startRestTimer\(setType==="warmup"\?60:120\)/);
+  assert.match(app, /workout_session_id/);
+  assert.match(app, /set_number/);
+  assert.match(app, /scheduled_sets_snapshot/);
+});
+
+test("set logging survives reload and offline use", () => {
+  assert.match(app, /divinity-pending-workout-entries-v1/);
+  assert.match(app, /writePendingEntries/);
+  assert.match(app, /divinity-rest-timer-ends-at/);
+  assert.match(app, /restoreRestTimer/);
+  assert.match(app, /divinity-log-draft/);
+});
+
+test("progress and sourced strength standards are exposed", () => {
+  assert.match(html, /Best estimated 1RM/);
+  assert.match(html, /Recent volume/);
+  assert.match(html, /Strength standards/);
+  assert.match(app, /strengthClassification/);
+  assert.match(app, /setVolume/);
+  assert.match(app, /estimatedOneRepMax/);
 });
 
 test("mobile controls avoid automatic zoom and load accepts decimals", () => {
