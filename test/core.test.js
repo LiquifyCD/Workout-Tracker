@@ -96,3 +96,8 @@ test("rejects unreasonably large backups", () => {
   assert.throws(() => validateBackup({ entries: Array(100001) }), /too many workout/);
   assert.throws(() => validateBackup({ checkins: Array(20001) }), /too many check-ins/);
 });
+
+test("keeps prescribed RIR in normalized schedules", () => {
+  const schedule = normalizeSchedule([{ day: "Day 1", title: "Upper", exs: [["Press", "2", "4–6", "Shoulder flexion", "press", [], "1 / 1"]] }]);
+  assert.equal(schedule[0].exs[0][6], "1 / 1");
+});

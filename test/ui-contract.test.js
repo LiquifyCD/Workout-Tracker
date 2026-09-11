@@ -28,7 +28,7 @@ test("saved schedule changes refresh editable day controls", () => {
 });
 
 test("offline install does not depend on the external Supabase CDN", () => {
-  assert.match(serviceWorker, /const CACHE = "divinity-v6"/);
+  assert.match(serviceWorker, /const CACHE = "divinity-v8"/);
   const shell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\];/)?.[1] || "";
   assert.doesNotMatch(shell, /SUPABASE_CDN/);
   assert.match(serviceWorker, /event\.waitUntil\(caches\.open\(CACHE\)\.then\(cache => cache\.put/);
@@ -91,4 +91,12 @@ test("settings are split into focused sections", () => {
   assert.match(html, /Training plan/);
   assert.match(html, /Data &amp; storage/);
   assert.match(html, /<h2>Account<\/h2>/);
+});
+
+test("primary workout flow exposes day, current set, prescription, and progress", () => {
+  for (const id of ["today-date", "today-day", "today-current-exercise", "today-prescription", "today-progress-bar", "log-current-exercise", "log-prescription", "workout-plan"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(html, /Save &amp; next set/);
+  assert.match(app, /rirForSet/);
 });

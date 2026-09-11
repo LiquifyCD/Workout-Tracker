@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "check": "node --check data/programs.js && node --check core.js && node --check app.js && node --check sw.js",
-    "test": "npm run check && html-validate index.html && node --test"
+    "test": "npm run check && html-validate index.html && node --test",
+    "build": "node scripts/build.mjs",
+    "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
-    "html-validate": "11.5.6"
+    "html-validate": "11.5.6",
+    "wrangler": "^4.131.0"
   },
   "engines": {
     "node": ">=22"

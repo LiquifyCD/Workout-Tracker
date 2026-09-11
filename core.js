@@ -225,7 +225,8 @@
         if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error(`${day}: "${name}" has an invalid stable ID.`);
         if (exerciseIds.has(id)) throw new Error(`${day}: stable ID "${id}" is duplicated.`);
         exerciseIds.add(id);
-        return [name, sets, reps, note, id, [...new Set(aliases)]];
+        const prescribedRir = String(exercise?.[6] || "").trim();
+        return [name, sets, reps, note, id, [...new Set(aliases)], prescribedRir];
       });
       return { id, day, type, title, focus, exs };
     });

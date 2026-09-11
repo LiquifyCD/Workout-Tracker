@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050507">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-  <title>Divinity — Training Tracker</title>
+  <title>Divinity — 48-Hour Rotation</title>
 
   <link rel="icon" href="./favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
@@ -69,30 +69,49 @@
 
   <main class="app">
     <section id="page-dashboard" class="page active">
-      <div class="grid3">
-        <div class="stat"><div class="label">Completed workouts</div><div class="value" id="stat-workouts">0</div><div class="sub">for selected profile</div></div>
-        <div class="stat"><div class="label">Next loop day</div><div class="value" id="stat-next">Day 1</div><div class="sub" id="stat-next-title">Workout</div></div>
-      </div>
+      <section class="today-hero card" aria-labelledby="today-title">
+        <div class="today-copy">
+          <div class="eyebrow"><span id="today-date">Today</span><span id="today-day">Day 1 of 6</span></div>
+          <h2 id="today-title">Upper · Chest priority</h2>
+          <p id="today-focus">15 sets · ~60 min</p>
+          <div class="today-profile"><span id="today-profile">Alfred</span><span id="today-progress-label">0 of 15 sets</span></div>
+          <div class="session-progress" aria-hidden="true"><span id="today-progress-bar"></span></div>
+        </div>
+        <div class="current-exercise-panel">
+          <span class="eyebrow-label">Current exercise</span>
+          <h3 id="today-current-exercise">Smith machine incline press</h3>
+          <div class="prescription" id="today-prescription">Set 1 of 2 · 4–6 reps · RIR 1</div>
+          <button class="btn primary hero-action" data-page="log">Start workout</button>
+        </div>
+      </section>
 
       <div id="usage-alert" class="warnbox ok" style="display:none;margin-bottom:12px"></div>
 
-      <div class="section"><h2>Next workout</h2><span class="tag purple" id="next-tag">Day 1</span></div>
-      <div class="card" id="next-card"></div>
+      <div class="section"><h2>Today's exercise order</h2><span class="tag purple" id="next-tag">Day 1</span></div>
+      <div class="exercise-track" id="next-card"></div>
 
       <div class="section"><h2>Recent entries</h2><button class="btn ghost" data-action="refresh">Refresh</button></div>
       <div class="card tablewrap"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Decision</th></tr></thead><tbody id="recent-body"></tbody></table><div id="recent-empty" class="empty"><h3>No logs yet</h3><p>Go to Log and save the first set.</p></div></div>
     </section>
 
     <section id="page-log" class="page">
-      <div class="section"><h2>Log set</h2><span class="tag purple" id="log-profile-tag">Profile</span></div>
-      <div id="workout-plan" class="set-plan" aria-live="polite"></div>
-      <div class="card pad">
-        <div class="formgrid">
+      <div class="session-head">
+        <div><div class="eyebrow" id="log-day-title">Day 1 · Upper</div><h2 id="log-current-exercise">Current exercise</h2><p id="log-joint-action" class="meta"></p></div>
+        <div class="session-count"><strong id="log-set-step">Set 1 / 2</strong><span id="log-exercise-step">exercise 1 of 9</span></div>
+      </div>
+      <div class="prescription-banner" id="log-prescription">4–6 reps · RIR 1</div>
+      <div class="session-progress log-progress" aria-hidden="true"><span id="log-progress-bar"></span></div>
+      <div class="workout-layout">
+      <div class="card pad log-card">
+        <details class="workout-picker">
+          <summary>Change workout or exercise</summary>
+          <div class="formgrid picker-grid">
           <div class="field"><label for="log-profile">Profile</label><select id="log-profile"></select></div>
           <div class="field"><label for="log-day">Loop day</label><select id="log-day"></select></div>
-        </div>
-        <div class="field" style="margin-top:12px"><label for="log-ex">Exercise</label><select id="log-ex"></select></div>
-        <div class="formgrid three" style="margin-top:12px">
+          </div>
+          <div class="field" style="margin-top:12px"><label for="log-ex">Exercise</label><select id="log-ex"></select></div>
+        </details>
+        <div class="formgrid three log-fields">
           <div class="field"><label for="log-load">Load kg</label><input id="log-load" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" maxlength="8" placeholder="60.25" aria-describedby="log-load-hint"><span id="log-load-hint" class="field-hint">Use a decimal point or comma.</span></div>
           <div class="field"><label for="log-s1">Reps</label><input id="log-s1" type="number" min="1" max="50" placeholder="6"></div>
           <div class="field"><label for="log-rir">RIR</label><input id="log-rir" type="number" min="0" max="5" placeholder="1"></div>
@@ -102,9 +121,11 @@
           <div class="field"><label for="log-range">Rep target</label><select id="log-range"><option value="4-7">4–7 stable compounds</option><option value="6-10">6–10 isolations</option><option value="8-15">8–15 raises</option><option value="6-12">6–12 calves</option></select></div>
         </div>
         <div class="field" style="margin-top:12px"><label for="log-notes">Notes</label><input id="log-notes" type="text" maxlength="2000" placeholder="Form clean, slight fatigue..."></div>
-        <div class="btnrow" style="margin-top:14px"><button class="btn primary" data-action="add-entry">Save set</button><button class="btn" data-action="skip-set">Skip set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button><button id="cancel-edit" class="btn ghost" data-action="cancel-edit" hidden>Cancel edit</button></div>
+        <div class="btnrow log-actions"><button class="btn primary save-set" data-action="add-entry">Save &amp; next set</button><button class="btn" data-action="skip-set">Skip set</button><button class="btn" data-action="complete-workout">Complete workout</button><button class="btn ghost" data-action="clear-form">Clear</button><button id="cancel-edit" class="btn ghost" data-action="cancel-edit" hidden>Cancel edit</button></div>
         <div id="log-preview" style="margin-top:16px"></div>
         <div id="decision" class="decision"><h3>Next decision</h3><div id="decision-main"></div><p id="decision-reason"></p></div>
+      </div>
+      <aside id="workout-plan" class="set-plan exercise-rail" aria-live="polite"></aside>
       </div>
       <div class="section"><h2>Rest timer</h2><span class="timer" id="timer-display" aria-live="polite">00:00</span></div>
       <div class="card pad btnrow"><button class="btn" data-timer="60">1:00</button><button class="btn" data-timer="90">1:30</button><button class="btn" data-timer="120">2:00</button><button class="btn ghost" data-action="stop-timer">Stop</button></div>

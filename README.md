@@ -1,6 +1,8 @@
 # Divinity Workout Tracker
 
-Installable workout PWA using Supabase Auth and Postgres persistence.
+Installable workout PWA deployed on Cloudflare Workers, using Supabase Auth and Postgres persistence.
+
+The active programme is the six-day 48-hour rotation from `48-Hour-Rotation.pdf`. The dashboard highlights today's rotation day, current exercise, prescribed sets/reps/RIR, and set progress.
 
 ## Tracking
 
@@ -49,7 +51,8 @@ It adds profile-level standard inputs and non-destructive per-set snapshots. Exi
 ```powershell
 npm.cmd install
 npm.cmd test
-python -m http.server 8000
+npm.cmd run build
+npm.cmd run deploy
 ```
 
-Open `http://localhost:8000`. Test iPhone 13 sizing at `390 × 844` and desktop at `2560 × 1440`.
+For local UI testing, serve `dist/` and open it with `?preview=1`. Test iPhone 13 sizing at `390 × 844` and desktop at `2560 × 1440`.

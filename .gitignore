@@ -1,4 +1,9 @@
 node_modules/
+dist/
+.wrangler/
+tmp/
+.playwright-cli/
+output/
 *.log
 .DS_Store
 Thumbs.db

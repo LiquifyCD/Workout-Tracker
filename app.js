@@ -37,6 +37,7 @@ const PROFILE_COLUMNS = "profile_key,display_name,expected_sessions_per_week,sch
 const WORKOUT_COLUMNS = "id,entry_date,profile_key,loop_day,schedule_day_id,workout_title,exercise,exercise_id,load_kg,set_1_reps,set_2_reps,rir,rep_range,decision,notes,is_rest_day,set_type,deleted_at,created_at,workout_session_id,set_number,scheduled_sets_snapshot,set_status";
 const PENDING_KEY = "divinity-pending-workout-entries-v1";
 const TIMER_KEY = "divinity-rest-timer-ends-at";
+const LOCAL_PREVIEW = ["localhost","127.0.0.1"].includes(location.hostname)&&new URLSearchParams(location.search).has("preview");
 
 function qs(id){return document.getElementById(id)}
 function profileByKey(key){return PROFILES.find(p=>p.key===key)||PROFILES[0]}
@@ -50,6 +51,10 @@ function stableEntryExerciseId(name,explicitId){const derived=slugifyExercise(na
 function activeProfile(){return profileByKey(currentProfileKey)}
 function activeSettings(key=currentProfileKey){return profileSettings[key] || {...profileByKey(key), schedule_json: profileByKey(key).defaultSchedule, expected_sessions_per_week: profileByKey(key).defaultExpected}}
 function activeSchedule(key=currentProfileKey){return activeSettings(key).schedule_json || profileByKey(key).defaultSchedule}
+function isCurrentRotation(schedule){return Array.isArray(schedule)&&schedule.length===6&&schedule.every((day,index)=>day.id===`rotation-day-${index+1}`)}
+function humanDate(){return new Intl.DateTimeFormat("en",{weekday:"long",month:"short",day:"numeric"}).format(new Date())}
+function exerciseRir(exercise){return exercise?.[6]||"as prescribed"}
+function rirForSet(exercise,setNumber=1){const values=exerciseRir(exercise).split("/").map(value=>value.trim()).filter(Boolean);return values[Math.min(setNumber-1,values.length-1)]||values[0]||"—"}
 function toast(msg,type=""){const t=qs("toast");clearTimeout(toastTimer);t.textContent=msg;t.className=`toast ${type} show`.trim();toastTimer=setTimeout(()=>{t.className="toast"},type==="error"?5000:2500)}
 function setSync(status,msg){const d=qs("sync-dot"), s=qs("sync-text"); d.className="dot "+(status||""); s.textContent=msg;}
 function reportError(context,error){
@@ -117,6 +122,11 @@ async function signOut(){const {error}=await supabaseClient.auth.signOut();if(er
 async function getUser(){const {data,error}=await supabaseClient.auth.getUser();if(error?.name==="AuthSessionMissingError")return null;if(error){reportError("Could not check authentication",error);return null}return data.user}
 async function checkAuth(){
   setSync("", "Checking");
+  if(LOCAL_PREVIEW){
+    user={id:"local-preview"};
+    profileSettings=Object.fromEntries(PROFILES.map(profile=>[profile.key,{...profile,schedule_json:profile.defaultSchedule,expected_sessions_per_week:profile.defaultExpected,strength_sex:null,body_weight_kg:null}]));
+    setLoginVisible(false);setSync("ok","Preview");renderAll();return;
+  }
   user=await getUser();
   if(!user){setLoginVisible(true);setSync("bad","Signed out");return}
   setLoginVisible(false);
@@ -130,8 +140,9 @@ function renderProfilePicker(){
 
 async function ensureProfileSettings(){
   for(const p of PROFILES){
-    if(profileSettings[p.key]) continue;
-    const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
+    if(profileSettings[p.key]&&isCurrentRotation(profileSettings[p.key].schedule_json)) continue;
+    const existing=profileSettings[p.key]||{};
+    const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule,strength_sex:existing.strength_sex||null,body_weight_kg:existing.body_weight_kg??null};
     const saved=await upsertProfileSettings(row);
     profileSettings[p.key]={...p,...row,...saved};
   }
@@ -251,10 +262,20 @@ function currentPlannedSlot(dayRef=qs("log-day").value,key=currentProfileKey){re
 function plannedSlotForExercise(exerciseId,dayRef=qs("log-day").value,key=currentProfileKey){return workoutPlan(dayRef,key).find(slot=>slot.exerciseId===exerciseId&&!slot.entry)||null}
 function nextExerciseForDay(dayRef,key=currentProfileKey){return currentPlannedSlot(dayRef,key)?.exerciseId||stableExerciseId(scheduleByDay(dayRef,key).exs[0])}
 function renderWorkoutPlan(){
-  const slots=workoutPlan(),current=currentPlannedSlot();
-  qs("workout-plan").innerHTML=`<div class="card pad"><div class="set-plan-head"><div><strong>${escapeHtml(scheduleByDay(qs("log-day").value).title)}</strong><div class="meta">${current?`Current: ${escapeHtml(current.exercise[0])}, set ${current.number} of ${current.total}`:"All scheduled sets handled"}</div></div><span class="tag purple">${slots.filter(slot=>slot.entry).length}/${slots.length}</span></div><div class="set-plan-list">${slots.map(slot=>{const target=normalizeRange(slot.exercise[2]);const result=slot.entry?.status==="skipped"?"Skipped":slot.entry?`${slot.entry.load} kg × ${slot.entry.s1} reps`:`Target ${target} reps`;return `<button class="set-chip ${slot.entry?slot.entry.status==="skipped"?"skipped":"complete":current===slot?"current":""}" data-plan-exercise="${escapeAttr(slot.exerciseId)}" ${slot.entry?"disabled":""}><span>${escapeHtml(slot.exercise[0])}</span><small>Set ${slot.number}/${slot.total}${slot.optional?" · optional":""} · ${escapeHtml(result)}${slot.entry?.status!=="skipped"&&slot.entry?` · target ${escapeHtml(target)}`:""}</small></button>`}).join("")}</div></div>`;
+  const slots=workoutPlan(),current=currentPlannedSlot(),day=scheduleByDay(qs("log-day").value),done=slots.filter(slot=>slot.entry).length;
+  qs("workout-plan").innerHTML=`<div class="eyebrow">Today's session</div><div class="set-plan-head"><strong>${done} / ${slots.length} sets</strong></div><div class="set-plan-list">${slots.map(slot=>{const target=normalizeRange(slot.exercise[2]);const result=slot.entry?.status==="skipped"?"Skipped":slot.entry?`${slot.entry.load} kg × ${slot.entry.s1} reps`:`Target ${target} reps · RIR ${rirForSet(slot.exercise,slot.number)}`;return `<button class="set-chip ${slot.entry?slot.entry.status==="skipped"?"skipped":"complete":current===slot?"current":""}" data-plan-exercise="${escapeAttr(slot.exerciseId)}" ${slot.entry?"disabled":""}><span>${escapeHtml(slot.exercise[0])}</span><small>Set ${slot.number}/${slot.total}${slot.optional?" · optional":""} · ${escapeHtml(result)}</small></button>`}).join("")}</div>`;
+  renderLogContext(day,slots,current);
 }
-function renderLogPreview(){const exercise=selectedExercise(); if(!exercise) return; const slot=plannedSlotForExercise(stableExerciseId(exercise)),last=latestSetFor(exercise); const prefix=slot?`Scheduled set ${slot.number} of ${slot.total}. `:"No remaining scheduled sets. "; if(!last){qs("log-preview").innerHTML=`<div class="warnbox"><strong>${escapeHtml(exercise[0])}</strong>. ${prefix}No recent work set yet.</div>`; return;} qs("log-preview").innerHTML=`<div class="warnbox"><strong>${escapeHtml(exercise[0])}</strong>. ${prefix}Last work set ${escapeHtml(last.load??"—")} kg × ${escapeHtml(last.s1)} reps, ${escapeHtml(last.decision)}.</div>`}
+function renderLogContext(day= scheduleByDay(qs("log-day").value),slots=workoutPlan(),current=currentPlannedSlot()){
+  const exercise=selectedExercise();if(!exercise)return;
+  const selectedSlot=plannedSlotForExercise(stableExerciseId(exercise))||current,index=day.exs.findIndex(item=>stableExerciseId(item)===stableExerciseId(exercise)),done=slots.filter(slot=>slot.entry).length;
+  qs("log-day-title").textContent=`${day.day} · ${day.type}`;qs("log-current-exercise").textContent=exercise[0];qs("log-joint-action").textContent=exercise[3]||"";
+  qs("log-set-step").textContent=selectedSlot?`Set ${selectedSlot.number} / ${selectedSlot.total}`:"All sets done";qs("log-exercise-step").textContent=`exercise ${index+1} of ${day.exs.length}`;
+  qs("log-prescription").textContent=selectedSlot?`${exercise[2]} reps · RIR ${rirForSet(exercise,selectedSlot.number)}`:`${exercise[1]} sets · ${exercise[2]} reps`;
+  qs("log-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;
+  if(selectedSlot)qs("log-rir").placeholder=rirForSet(exercise,selectedSlot.number).replace("—","");
+}
+function renderLogPreview(){const exercise=selectedExercise(); if(!exercise) return; const slot=plannedSlotForExercise(stableExerciseId(exercise)),last=latestSetFor(exercise); if(!last){qs("log-preview").innerHTML=`<div class="previous-set"><span>Previous</span><strong>No earlier work set</strong></div>`; return;} qs("log-preview").innerHTML=`<div class="previous-set"><span>Previous</span><strong>${escapeHtml(last.load??"—")} kg · ${escapeHtml(last.s1)} reps · RIR ${escapeHtml(last.rir??"—")}</strong></div>`}
 function fillExercisesForDay(){
   const d=scheduleByDay(qs("log-day").value,currentProfileKey);
   qs("log-ex").innerHTML=d.exs.map(e=>`<option value="${escapeAttr(stableExerciseId(e))}">${escapeHtml(e[0])}</option>`).join("");
@@ -271,6 +292,7 @@ function setExerciseDefaults(){
   qs("log-load").value=last?.load??"";
   qs("log-s1").value=last?.s1||midpoint;
   renderLogPreview();
+  renderLogContext();
 }
 function clearForm(){["log-rir","log-notes"].forEach(id=>qs(id).value="");qs("decision").classList.remove("show");if(!editingEntryId)setExerciseDefaults();saveLogDraft()}
 function cancelEdit(){editingEntryId=null;qs("cancel-edit").hidden=true;document.querySelector('[data-action="add-entry"]').textContent="Save set";clearForm();fillExercisesForDay()}
@@ -361,20 +383,17 @@ function usageEstimate(){
 }
 
 function renderDashboard(){
-  const n=activeSchedule()[nextDayIndex()];
+  const n=activeSchedule()[nextDayIndex()],slots=workoutPlan(n.id),current=currentPlannedSlot(n.id),done=slots.filter(slot=>slot.entry).length,currentExercise=current?.exercise||n.exs.at(-1);
   qs("brand-sub").textContent=`${activeProfile().name} · group tracker`;
   if(qs("active-profile-btn")) qs("active-profile-btn").textContent=activeProfile().name;
-  qs("stat-workouts").textContent=completedEntries().length;
-  qs("stat-next").textContent=n.day;
-  qs("stat-next-title").textContent=n.title;
+  qs("today-date").textContent=humanDate();qs("today-day").textContent=`${n.day} of ${activeSchedule().length}`;qs("today-title").textContent=n.title;qs("today-focus").textContent=n.focus;qs("today-profile").textContent=activeProfile().name;qs("today-progress-label").textContent=`${done} of ${slots.length} sets`;qs("today-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;qs("today-current-exercise").textContent=current?currentExercise[0]:"Workout ready to complete";qs("today-prescription").textContent=current?`Set ${current.number} of ${current.total} · ${currentExercise[2]} reps · RIR ${rirForSet(currentExercise,current.number)}`:"All prescribed sets handled";
   qs("next-tag").textContent=`${activeProfile().name} · ${n.type}`;
   const u=usageEstimate();
   qs("usage-alert").style.display=u.level==="ok"?"none":"block";
   qs("usage-alert").className="warnbox "+u.level;
   qs("usage-alert").innerHTML=`<b>Storage alert:</b> ${u.msg} Estimated database use: ${u.mb.toFixed(2)} MB / 500 MB.`;
-  qs("next-card").innerHTML=`<div class="workout-head"><div><div class="workout-title">${escapeHtml(n.title)}</div><div class="workout-sub">${escapeHtml(activeProfile().name)} · ${escapeHtml(n.focus)}. Complete this workout to advance this profile's loop.</div></div><div class="btnrow"><button class="btn primary" data-page="log">Log set</button><button class="btn" data-action="complete-dashboard-workout">Complete</button><button class="btn ghost" data-action="log-rest-day">Rest</button></div></div><div class="tablewrap"><table><thead><tr><th>Exercise</th><th>Sets</th><th>Target</th><th>Last load</th><th>Decision</th></tr></thead><tbody>${n.exs.map(e=>{const last=latestSetFor(e);return `<tr><td><div class="exname">${escapeHtml(e[0])}</div><div class="meta">${escapeHtml(e[3]||"")}</div></td><td class="mono">${escapeHtml(e[1])}</td><td class="mono">${escapeHtml(e[2])}</td><td class="mono">${last&&last.load!=null?escapeHtml(last.load)+" kg":"—"}</td><td>${last?`<span class="badge ${decisionClass(last.decision)}">${escapeHtml(last.decision)}</span>`:'<span class="meta">—</span>'}</td></tr>`}).join("")}</tbody></table></div>`;
+  qs("next-card").innerHTML=n.exs.map((exercise,index)=>{const id=stableExerciseId(exercise),exerciseSlots=slots.filter(slot=>slot.exerciseId===id),exerciseDone=exerciseSlots.filter(slot=>slot.entry).length,isCurrent=current?.exerciseId===id;return `<button class="track-exercise ${exerciseDone===exerciseSlots.length?"done":""} ${isCurrent?"current":""}" data-day-id="${escapeAttr(n.id)}" data-plan-exercise="${escapeAttr(id)}"><span class="track-number">${exerciseDone===exerciseSlots.length?"✓":index+1}</span><span class="track-copy"><strong>${escapeHtml(exercise[0])}</strong><small>${escapeHtml(exercise[3])}</small></span><span class="track-prescription">${exerciseDone}/${exerciseSlots.length} sets<small>${escapeHtml(exercise[2])} reps · RIR ${escapeHtml(exerciseRir(exercise))}</small></span></button>`}).join("");
   const recent=setEntries().slice(0,8); setEmptyState("recent-empty",recent.length>0); qs("recent-body").innerHTML=recent.map(rowHtml).join("");
-  qs("log-profile-tag").textContent=activeProfile().name;
 }
 function rowHtml(e){return `<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td><span class="tag">${escapeHtml(e.day)}</span></td><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}${e.load!=null?" kg":""}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`}
 function renderLoads(){
@@ -439,7 +458,7 @@ function renderTrash(){const rows=allEntries.filter(entry=>entry.deletedAt&&entr
 function renderSchedule(){
   qs("schedule-title").textContent=`${activeProfile().name} schedule`;
   qs("schedule-expected").textContent=`${activeSettings().expected_sessions_per_week} / week`;
-  qs("schedule-grid").innerHTML=activeSchedule().map((d,index)=>`<div class="day-card"><div class="day-head"><div class="circle">${index+1}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.day)} · ${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}</span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}</span></div>`).join("")}</div>`).join("");
+  qs("schedule-grid").innerHTML=activeSchedule().map((d,index)=>`<div class="day-card ${index===nextDayIndex()?"current":""}"><div class="day-head"><div class="circle">${index+1}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.day)} · ${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}<small>${escapeHtml(e[3]||"")}</small></span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}<small>RIR ${escapeHtml(exerciseRir(e))}</small></span></div>`).join("")}</div>`).join("");
 }
 function renderSettings(){
   qs("settings-profile").textContent=activeProfile().name;
@@ -457,9 +476,9 @@ function loadEditorForProfile(key){
   editorProfileKey=key;
   const st=activeSettings(key); qs("edit-expected").value=st.expected_sessions_per_week;
   qs("edit-profile-tag").textContent=profileByKey(key).name;
-  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label for="ed-day-${idx}">Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}" maxlength="80"></div><div class="field"><label for="ed-title-${idx}">Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}" maxlength="120"></div><div class="field"><label for="ed-focus-${idx}">Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}" maxlength="120"></div></div><div class="field" style="margin-top:10px"><label for="ed-exs-${idx}">Exercises — name | sets | reps | note | stable ID | aliases</label><textarea id="ed-exs-${idx}" maxlength="20000">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", ")].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
+  qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label for="ed-day-${idx}">Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}" maxlength="80"></div><div class="field"><label for="ed-title-${idx}">Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}" maxlength="120"></div><div class="field"><label for="ed-focus-${idx}">Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}" maxlength="120"></div></div><div class="field" style="margin-top:10px"><label for="ed-exs-${idx}">Exercises — name | sets | reps | joint action | stable ID | aliases | RIR</label><textarea id="ed-exs-${idx}" maxlength="20000">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", "),e[6]||""].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
 }
-function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||"",parts[4]||slugifyExercise(parts[0]),parts[5]?parts[5].split(",").map(x=>x.trim()).filter(Boolean):[]]})}
+function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||"",parts[4]||slugifyExercise(parts[0]),parts[5]?parts[5].split(",").map(x=>x.trim()).filter(Boolean):[],parts[6]||""]})}
 async function saveEditedSchedule(){
   try{
     const selectedDay=qs("log-day").value,expectedSessions=Number(qs("edit-expected").value);
@@ -555,7 +574,7 @@ async function handleClick(event){
     if(button.dataset.timer){startRestTimer(Number(button.dataset.timer));return}
     if(button.dataset.deleteId){await deleteEntry(button.dataset.deleteId);return}
     if(button.dataset.editId){editEntry(button.dataset.editId);return}
-    if(button.dataset.planExercise){qs("log-ex").value=button.dataset.planExercise;setExerciseDefaults();return}
+    if(button.dataset.planExercise){if(button.dataset.dayId){qs("log-day").value=button.dataset.dayId;fillExercisesForDay()}qs("log-ex").value=button.dataset.planExercise;setExerciseDefaults();showPage("log");return}
     if(button.dataset.restoreId){await restoreEntry(button.dataset.restoreId);return}
     if(button.dataset.permanentId){await permanentlyDeleteEntry(button.dataset.permanentId);return}
     const action=ACTIONS[button.dataset.action];
