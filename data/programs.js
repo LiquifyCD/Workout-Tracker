@@ -75,9 +75,6 @@
   ];
 
   globalThis.DIVINITY_PROFILES = [
-    { key: "alfred", name: "Alfred", color: "#ff6b35", defaultExpected: 7, defaultSchedule: clone(rotation) },
-    { key: "maja", name: "Maja", color: "#ffb000", defaultExpected: 7, defaultSchedule: clone(rotation) },
-    { key: "elias", name: "Elias", color: "#2dd4bf", defaultExpected: 7, defaultSchedule: clone(rotation) },
-    { key: "jacqueline", name: "Jacqueline", color: "#f8fafc", defaultExpected: 7, defaultSchedule: clone(rotation) }
+    { key: "alfred", name: "Workout", color: "#8b5cf6", defaultExpected: 7, defaultSchedule: clone(rotation) }
   ];
 })();

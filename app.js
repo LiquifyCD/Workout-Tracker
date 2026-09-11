@@ -7,6 +7,8 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_
 const {decide,escapeAttr,escapeHtml,estimatedOneRepMax,exerciseIdentity,isUuid,localDateKey,normalizeRange,normalizeSchedule,parseDecimal,personalRecord,progressSeries,rangeMidpoint,scheduledSetSlots,setVolume,slugifyExercise,strengthClassification,validateBackup}=DivinityCore;
 
 const PROFILES = globalThis.DIVINITY_PROFILES;
+const PROFILE = PROFILES[0];
+const PROFILE_KEY = PROFILE.key;
 const COMPLETE_EX = "__WORKOUT_COMPLETE__";
 const NAV_ITEMS = [
   {page:"dashboard",desktop:"Dashboard",mobile:"Home"},
@@ -19,9 +21,9 @@ let entries = [];
 let allEntries = [];
 let profileSettings = {};
 let user = null;
-let currentProfileKey = localStorage.getItem("divinity-profile") || "alfred";
+const currentProfileKey = PROFILE_KEY;
 let histFilter = "all";
-let editorProfileKey = currentProfileKey;
+const editorProfileKey = PROFILE_KEY;
 let historyPage = 0;
 let lastDeletedId = null;
 let timerInterval = null;
@@ -31,6 +33,7 @@ let deferredInstallPrompt = null;
 let waitingWorker = null;
 let toastTimer = null;
 let modalReturnFocus = null;
+let confirmationResolve = null;
 const DATA_PAGE_SIZE = 500;
 const HISTORY_PAGE_SIZE = 50;
 const PROFILE_COLUMNS = "profile_key,display_name,expected_sessions_per_week,schedule_json,strength_sex,body_weight_kg";
@@ -40,7 +43,7 @@ const TIMER_KEY = "divinity-rest-timer-ends-at";
 const LOCAL_PREVIEW = ["localhost","127.0.0.1"].includes(location.hostname)&&new URLSearchParams(location.search).has("preview");
 
 function qs(id){return document.getElementById(id)}
-function profileByKey(key){return PROFILES.find(p=>p.key===key)||PROFILES[0]}
+function profileByKey(){return PROFILE}
 function catalogExerciseId(name){
   const normalized=String(name||"").toLowerCase();
   for(const profile of PROFILES)for(const day of profile.defaultSchedule)for(const exercise of day.exs){if([exercise[0],...(exercise[5]||[])].some(alias=>String(alias).toLowerCase()===normalized))return exercise[4]}
@@ -48,7 +51,7 @@ function catalogExerciseId(name){
 }
 function stableExerciseId(exercise){return exercise?.[4]||catalogExerciseId(exercise?.[0])||exerciseIdentity(exercise)}
 function stableEntryExerciseId(name,explicitId){const derived=slugifyExercise(name),catalogId=catalogExerciseId(name);return explicitId&&explicitId!==derived?explicitId:(catalogId||explicitId||derived)}
-function activeProfile(){return profileByKey(currentProfileKey)}
+function activeProfile(){return PROFILE}
 function activeSettings(key=currentProfileKey){return profileSettings[key] || {...profileByKey(key), schedule_json: profileByKey(key).defaultSchedule, expected_sessions_per_week: profileByKey(key).defaultExpected}}
 function activeSchedule(key=currentProfileKey){return activeSettings(key).schedule_json || profileByKey(key).defaultSchedule}
 function isCurrentRotation(schedule){return Array.isArray(schedule)&&schedule.length===6&&schedule.every((day,index)=>day.id===`rotation-day-${index+1}`)}
@@ -72,7 +75,7 @@ function renderNavigation(){
 function showPage(page){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));qs("page-"+page).classList.add("active");setActiveButtons(page)}
 function shouldAutofocus(){return matchMedia("(min-width: 901px) and (pointer: fine)").matches}
 function updateModalLock(){
-  const modal=document.querySelector(".auth.show,.profile-screen.show");
+  const modal=document.querySelector(".auth.show,.confirm-dialog.show");
   document.body.classList.toggle("modal-open",!!modal);
   [document.querySelector(".topbar"),document.querySelector(".app"),document.querySelector(".bottomnav")].forEach(element=>{if(element)element.inert=!!modal});
   if(modal){
@@ -82,8 +85,26 @@ function updateModalLock(){
     const target=modalReturnFocus;modalReturnFocus=null;target?.focus?.();
   }
 }
-function showProfilePicker(){renderProfilePicker();qs("profile-screen").classList.add("show");updateModalLock()}
-function hideProfilePicker(){qs("profile-screen").classList.remove("show");updateModalLock()}
+function requestConfirmation({title="Confirm action",message,confirmLabel="Confirm",danger=true}){
+  if(confirmationResolve)confirmationResolve(false);
+  qs("confirm-title").textContent=title;
+  qs("confirm-message").textContent=message;
+  const accept=qs("confirm-accept");
+  accept.textContent=confirmLabel;
+  accept.className=`btn ${danger?"bad":"primary"}`;
+  qs("confirm-dialog").classList.add("show");
+  updateModalLock();
+  queueMicrotask(()=>accept.focus());
+  return new Promise(resolve=>{confirmationResolve=resolve});
+}
+function closeConfirmation(accepted=false){
+  if(!confirmationResolve)return;
+  const resolve=confirmationResolve;
+  confirmationResolve=null;
+  qs("confirm-dialog").classList.remove("show");
+  updateModalLock();
+  resolve(accepted);
+}
 function setLoginVisible(visible){
   qs("auth").classList.toggle("show",visible);
   updateModalLock();
@@ -124,22 +145,17 @@ async function checkAuth(){
   setSync("", "Checking");
   if(LOCAL_PREVIEW){
     user={id:"local-preview"};
-    profileSettings=Object.fromEntries(PROFILES.map(profile=>[profile.key,{...profile,schedule_json:profile.defaultSchedule,expected_sessions_per_week:profile.defaultExpected,strength_sex:null,body_weight_kg:null}]));
+    profileSettings={[PROFILE_KEY]:{...PROFILE,schedule_json:PROFILE.defaultSchedule,expected_sessions_per_week:PROFILE.defaultExpected,strength_sex:null,body_weight_kg:null}};
     setLoginVisible(false);setSync("ok","Preview");renderAll();return;
   }
   user=await getUser();
   if(!user){setLoginVisible(true);setSync("bad","Signed out");return}
   setLoginVisible(false);
   await loadAllData();
-  if(!localStorage.getItem("divinity-profile")) showProfilePicker();
-}
-
-function renderProfilePicker(){
-  qs("profile-grid").innerHTML = PROFILES.map(p=>`<button class="profile-btn ${p.key===currentProfileKey?'active':''}" data-profile="${p.key}"><strong>${p.name}</strong><span>${activeSettings(p.key).expected_sessions_per_week} expected sessions / week</span></button>`).join("");
 }
 
 async function ensureProfileSettings(){
-  for(const p of PROFILES){
+  for(const p of [PROFILE]){
     if(profileSettings[p.key]&&isCurrentRotation(profileSettings[p.key].schedule_json)) continue;
     const existing=profileSettings[p.key]||{};
     const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule,strength_sex:existing.strength_sex||null,body_weight_kg:existing.body_weight_kg??null};
@@ -153,13 +169,13 @@ async function loadAllData(show=true){
     if(show)setSync("","Loading");
     user=user||await getUser();
     if(!user){entries=[];renderAll();return}
-    const settingsRows=queryData(await supabaseClient.from("profile_settings").select(PROFILE_COLUMNS).eq("user_id",user.id),"Could not load profile settings");
+    const settingsRows=queryData(await supabaseClient.from("profile_settings").select(PROFILE_COLUMNS).eq("user_id",user.id).eq("profile_key",PROFILE_KEY),"Could not load profile settings");
     profileSettings={};
     settingsRows.forEach(r=>{const base=profileByKey(r.profile_key);profileSettings[r.profile_key]={...base,...r,schedule_json:normalizeSchedule(r.schedule_json)}});
     await ensureProfileSettings();
     await syncPendingEntries();
     const entryRows=await loadWorkoutEntries();
-    const pendingRows=readPendingEntries().filter(row=>row.user_id===user.id);
+    const pendingRows=readPendingEntries().filter(row=>row.user_id===user.id&&row.profile_key===PROFILE_KEY);
     allEntries=[...pendingRows,...entryRows].map(mapWorkoutEntry).sort((a,b)=>String(b.created).localeCompare(String(a.created)));
     entries=allEntries.filter(entry=>!entry.deletedAt);
     setSync(pendingRows.length?"":"ok",pendingRows.length?`${pendingRows.length} pending`:"Synced");
@@ -170,7 +186,7 @@ async function loadAllData(show=true){
 async function loadWorkoutEntries(){
   const rows=[];
   for(let from=0;;from+=DATA_PAGE_SIZE){
-    const result=await supabaseClient.from("workout_entries").select(WORKOUT_COLUMNS).eq("user_id",user.id).order("created_at",{ascending:false}).order("id",{ascending:false}).range(from,from+DATA_PAGE_SIZE-1);
+    const result=await supabaseClient.from("workout_entries").select(WORKOUT_COLUMNS).eq("user_id",user.id).eq("profile_key",PROFILE_KEY).order("created_at",{ascending:false}).order("id",{ascending:false}).range(from,from+DATA_PAGE_SIZE-1);
     const page=queryData(result,"Could not load workout entries");
     rows.push(...page);
     if(page.length<DATA_PAGE_SIZE) return rows;
@@ -181,11 +197,11 @@ function readPendingEntries(){try{const value=JSON.parse(localStorage.getItem(PE
 function writePendingEntries(rows){localStorage.setItem(PENDING_KEY,JSON.stringify(rows))}
 async function syncPendingEntries(){
   if(!navigator.onLine||!user)return;
-  const rows=readPendingEntries().filter(row=>row.user_id===user.id);
+  const rows=readPendingEntries().filter(row=>row.user_id===user.id&&row.profile_key===PROFILE_KEY);
   if(!rows.length)return;
   const {error}=await supabaseClient.from("workout_entries").upsert(rows,{onConflict:"id"});
   if(error){console.warn("Pending workout entries remain queued",error);return}
-  writePendingEntries(readPendingEntries().filter(row=>row.user_id!==user.id));
+  writePendingEntries(readPendingEntries().filter(row=>row.user_id!==user.id||row.profile_key!==PROFILE_KEY));
 }
 
 function mapWorkoutEntry(r){return {id:r.id,date:r.entry_date,profile:r.profile_key||"alfred",day:r.loop_day,dayId:r.schedule_day_id||slugifyExercise(r.loop_day),title:r.workout_title,ex:r.exercise,exerciseId:stableEntryExerciseId(r.exercise,r.exercise_id),load:r.load_kg==null?null:Number(r.load_kg),s1:r.set_1_reps||0,s2:r.set_2_reps||0,rir:r.rir,range:r.rep_range,decision:r.decision||"",notes:r.notes||"",isRest:!!r.is_rest_day,setType:r.set_type||"work",deletedAt:r.deleted_at,created:r.created_at,sessionId:r.workout_session_id||null,setNumber:r.set_number||null,scheduledSets:r.scheduled_sets_snapshot||null,status:r.set_status||"logged"}}
@@ -198,13 +214,6 @@ async function upsertProfileSettings(row){
   return {...data,schedule_json:persistedSchedule};
 }
 
-function switchProfile(key, close=false){
-  currentProfileKey=key;localStorage.setItem("divinity-profile",key);
-  editorProfileKey=key;
-  if(close) hideProfilePicker();
-  renderAll();
-  loadEditorForProfile(key);
-}
 function profileEntries(key=currentProfileKey){return entries.filter(e=>e.profile===key)}
 function completedEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex===COMPLETE_EX&&!e.isRest)}
 function setEntries(key=currentProfileKey){return profileEntries(key).filter(e=>e.ex!==COMPLETE_EX&&!e.isRest&&e.setType!=="warmup"&&e.status!=="skipped")}
@@ -223,14 +232,8 @@ function guessedRangeFor(ex){
   if(/curl|extension|pec deck/i.test(ex) && !/stiff/i.test(ex)) return "6-10";
   return "4-7";
 }
-function fillProfileSelects(){
-  const opts=PROFILES.map(p=>`<option value="${p.key}">${p.name}</option>`).join("");
-  ["log-profile","edit-profile"].forEach(id=>{if(qs(id)) qs(id).innerHTML=opts});
-  qs("log-profile").value=currentProfileKey;
-}
 function fillDaySelect(preferredDay=""){
   if(!qs("log-day")) return;
-  fillProfileSelects();
   const sched=activeSchedule(currentProfileKey);
   qs("log-day").innerHTML=sched.map(d=>`<option value="${escapeAttr(d.id)}">${escapeHtml(d.day)} — ${escapeHtml(d.title)}</option>`).join("");
   const preferred=sched.find(d=>d.id===preferredDay||d.day===preferredDay);
@@ -323,7 +326,7 @@ async function addEntry(){
   let ok;
   if(editingEntryId){
     if(!navigator.onLine){toast("Reconnect before editing an existing set","error");return}
-    const {error}=await supabaseClient.from("workout_entries").update({load_kg:load,set_1_reps:s1,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,set_type:setType,set_status:"logged"}).eq("id",editingEntryId).eq("user_id",user.id);
+    const {error}=await supabaseClient.from("workout_entries").update({load_kg:load,set_1_reps:s1,rir:Number.isNaN(rir)?null:rir,rep_range:range,decision:dec.decision,notes,set_type:setType,set_status:"logged"}).eq("id",editingEntryId).eq("user_id",user.id).eq("profile_key",PROFILE_KEY);
     if(error){reportError("Could not update set",error);return}
     ok=true;editingEntryId=null;qs("cancel-edit").hidden=true;document.querySelector('[data-action="add-entry"]').textContent="Save set";await loadAllData(false);
   }else ok=await insertRow(row);
@@ -346,12 +349,12 @@ async function skipSet(){
 function editEntry(id){
   const entry=entries.find(item=>item.id===id);
   if(!entry||entry.isRest||entry.ex===COMPLETE_EX||entry.status==="skipped")return;
-  editingEntryId=id;switchProfile(entry.profile);fillDaySelect(entry.dayId);qs("log-ex").value=entry.exerciseId;qs("log-load").value=entry.load??"";qs("log-s1").value=entry.s1||"";qs("log-rir").value=entry.rir??"";qs("log-notes").value=entry.notes||"";qs("log-set-type").value=entry.setType;qs("log-range").value=entry.range;qs("cancel-edit").hidden=false;document.querySelector('[data-action="add-entry"]').textContent="Update set";showPage("log");renderLogPreview()
+  editingEntryId=id;fillDaySelect(entry.dayId);qs("log-ex").value=entry.exerciseId;qs("log-load").value=entry.load??"";qs("log-s1").value=entry.s1||"";qs("log-rir").value=entry.rir??"";qs("log-notes").value=entry.notes||"";qs("log-set-type").value=entry.setType;qs("log-range").value=entry.range;qs("cancel-edit").hidden=false;document.querySelector('[data-action="add-entry"]').textContent="Update set";showPage("log");renderLogPreview()
 }
 async function markWorkoutComplete(){
   const dayRef=qs("log-day").value, d=scheduleByDay(dayRef);
   const remaining=workoutPlan(dayRef).filter(slot=>!slot.entry);
-  if(remaining.length&&!confirm(`Complete workout with ${remaining.length} scheduled set(s) still open?`))return;
+  if(remaining.length&&!await requestConfirmation({title:"Complete workout?",message:`${remaining.length} scheduled set(s) are still open. Your logged sets will be kept.`,confirmLabel:"Complete workout",danger:false}))return;
   const ok=await insertRow({entry_date:localDateKey(),loop_day:d.day,schedule_day_id:d.id,workout_title:d.title,exercise:COMPLETE_EX,exercise_id:null,decision:"complete",notes:"Workout completed",is_rest_day:false,workout_session_id:sessionIdForDay(dayRef,currentProfileKey,true)});
   if(ok){localStorage.removeItem(sessionStorageKey(dayRef));toast(`${activeProfile().name}: ${d.day} completed`); fillDaySelect(); showPage("dashboard")}
 }
@@ -361,11 +364,11 @@ async function logRestDay(){
   const ok=await insertRow({entry_date:localDateKey(),loop_day:n.day,schedule_day_id:n.id,workout_title:"Rest day",exercise:"Rest day",exercise_id:null,decision:"rest",notes:"Recovery day",is_rest_day:true});
   if(ok) toast("Rest day logged");
 }
-async function deleteEntry(id){ if(!confirm("Move this entry to trash?"))return; const {error}=await supabaseClient.from("workout_entries").update({deleted_at:new Date().toISOString()}).eq("id",id).eq("user_id",user.id); if(error){reportError("Could not move workout entry",error);return} lastDeletedId=id;qs("undo-bar").hidden=false;await loadAllData(false);toast("Moved to trash") }
-async function restoreEntry(id){const {error}=await supabaseClient.from("workout_entries").update({deleted_at:null}).eq("id",id).eq("user_id",user.id);if(error){reportError("Could not restore entry",error);return}if(lastDeletedId===id){lastDeletedId=null;qs("undo-bar").hidden=true}await loadAllData(false);toast("Restored")}
-async function permanentlyDeleteEntry(id){if(!confirm("Permanently delete this entry? This cannot be undone."))return;const {error}=await supabaseClient.from("workout_entries").delete().eq("id",id).eq("user_id",user.id);if(error){reportError("Could not permanently delete entry",error);return}await loadAllData(false);toast("Permanently deleted")}
+async function deleteEntry(id){ if(!await requestConfirmation({title:"Move entry to trash?",message:"You can restore this entry from Trash.",confirmLabel:"Move to trash"}))return; const {error}=await supabaseClient.from("workout_entries").update({deleted_at:new Date().toISOString()}).eq("id",id).eq("user_id",user.id).eq("profile_key",PROFILE_KEY); if(error){reportError("Could not move workout entry",error);return} lastDeletedId=id;qs("undo-bar").hidden=false;await loadAllData(false);toast("Moved to trash") }
+async function restoreEntry(id){const {error}=await supabaseClient.from("workout_entries").update({deleted_at:null}).eq("id",id).eq("user_id",user.id).eq("profile_key",PROFILE_KEY);if(error){reportError("Could not restore entry",error);return}if(lastDeletedId===id){lastDeletedId=null;qs("undo-bar").hidden=true}await loadAllData(false);toast("Restored")}
+async function permanentlyDeleteEntry(id){if(!await requestConfirmation({title:"Delete permanently?",message:"This entry cannot be restored after deletion.",confirmLabel:"Delete permanently"}))return;const {error}=await supabaseClient.from("workout_entries").delete().eq("id",id).eq("user_id",user.id).eq("profile_key",PROFILE_KEY);if(error){reportError("Could not permanently delete entry",error);return}await loadAllData(false);toast("Permanently deleted")}
 async function undoDelete(){if(lastDeletedId)await restoreEntry(lastDeletedId)}
-async function clearProfileData(){ if(!confirm(`Move ALL data for ${activeProfile().name} to trash?`))return; const {error}=await supabaseClient.from("workout_entries").update({deleted_at:new Date().toISOString()}).eq("user_id",user.id).eq("profile_key",currentProfileKey).is("deleted_at",null); if(error){reportError("Could not move profile data",error);return} await loadAllData(false); toast("Profile data moved to trash") }
+async function clearProfileData(){ if(!await requestConfirmation({title:"Move all workout data to trash?",message:"All visible workout entries will be moved to Trash and can be restored individually.",confirmLabel:"Move all to trash"}))return; const {error}=await supabaseClient.from("workout_entries").update({deleted_at:new Date().toISOString()}).eq("user_id",user.id).eq("profile_key",PROFILE_KEY).is("deleted_at",null); if(error){reportError("Could not move workout data",error);return} await loadAllData(false); toast("Workout data moved to trash") }
 
 function stopRestTimer(){clearInterval(timerInterval);timerInterval=null;timerEndsAt=0;localStorage.removeItem(TIMER_KEY);qs("timer-display").textContent="00:00"}
 function startRestTimer(seconds){clearInterval(timerInterval);timerEndsAt=Date.now()+seconds*1000;localStorage.setItem(TIMER_KEY,String(timerEndsAt));tickRestTimer();timerInterval=setInterval(tickRestTimer,250)}
@@ -384,10 +387,9 @@ function usageEstimate(){
 
 function renderDashboard(){
   const n=activeSchedule()[nextDayIndex()],slots=workoutPlan(n.id),current=currentPlannedSlot(n.id),done=slots.filter(slot=>slot.entry).length,currentExercise=current?.exercise||n.exs.at(-1);
-  qs("brand-sub").textContent=`${activeProfile().name} · group tracker`;
-  if(qs("active-profile-btn")) qs("active-profile-btn").textContent=activeProfile().name;
-  qs("today-date").textContent=humanDate();qs("today-day").textContent=`${n.day} of ${activeSchedule().length}`;qs("today-title").textContent=n.title;qs("today-focus").textContent=n.focus;qs("today-profile").textContent=activeProfile().name;qs("today-progress-label").textContent=`${done} of ${slots.length} sets`;qs("today-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;qs("today-current-exercise").textContent=current?currentExercise[0]:"Workout ready to complete";qs("today-prescription").textContent=current?`Set ${current.number} of ${current.total} · ${currentExercise[2]} reps · RIR ${rirForSet(currentExercise,current.number)}`:"All prescribed sets handled";
-  qs("next-tag").textContent=`${activeProfile().name} · ${n.type}`;
+  qs("brand-sub").textContent="Workout tracker";
+  qs("today-date").textContent=humanDate();qs("today-day").textContent=`${n.day} of ${activeSchedule().length}`;qs("today-title").textContent=n.title;qs("today-focus").textContent=n.focus;qs("today-profile").textContent="48-hour rotation";qs("today-progress-label").textContent=`${done} of ${slots.length} sets`;qs("today-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;qs("today-current-exercise").textContent=current?currentExercise[0]:"Workout ready to complete";qs("today-prescription").textContent=current?`Set ${current.number} of ${current.total} · ${currentExercise[2]} reps · RIR ${rirForSet(currentExercise,current.number)}`:"All prescribed sets handled";
+  qs("next-tag").textContent=n.type;
   const u=usageEstimate();
   qs("usage-alert").style.display=u.level==="ok"?"none":"block";
   qs("usage-alert").className="warnbox "+u.level;
@@ -395,7 +397,7 @@ function renderDashboard(){
   qs("next-card").innerHTML=n.exs.map((exercise,index)=>{const id=stableExerciseId(exercise),exerciseSlots=slots.filter(slot=>slot.exerciseId===id),exerciseDone=exerciseSlots.filter(slot=>slot.entry).length,isCurrent=current?.exerciseId===id;return `<button class="track-exercise ${exerciseDone===exerciseSlots.length?"done":""} ${isCurrent?"current":""}" data-day-id="${escapeAttr(n.id)}" data-plan-exercise="${escapeAttr(id)}"><span class="track-number">${exerciseDone===exerciseSlots.length?"✓":index+1}</span><span class="track-copy"><strong>${escapeHtml(exercise[0])}</strong><small>${escapeHtml(exercise[3])}</small></span><span class="track-prescription">${exerciseDone}/${exerciseSlots.length} sets<small>${escapeHtml(exercise[2])} reps · RIR ${escapeHtml(exerciseRir(exercise))}</small></span></button>`}).join("");
   const recent=setEntries().slice(0,8); setEmptyState("recent-empty",recent.length>0); qs("recent-body").innerHTML=recent.map(rowHtml).join("");
 }
-function rowHtml(e){return `<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td><span class="tag">${escapeHtml(e.day)}</span></td><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}${e.load!=null?" kg":""}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`}
+function rowHtml(e){return `<tr><td class="mono">${escapeHtml(e.date)}</td><td><span class="tag">${escapeHtml(e.day)}</span></td><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}${e.load!=null?" kg":""}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`}
 function renderLoads(){
   const map={}; setEntries().forEach(e=>{if(!map[e.ex])map[e.ex]=e});
   const rows=Object.values(map); setEmptyState("loads-empty",rows.length>0);
@@ -412,8 +414,8 @@ function renderHistory(){
   historyPage=Math.min(historyPage,totalPages-1);
   const pageRows=rows.slice(historyPage*HISTORY_PAGE_SIZE,(historyPage+1)*HISTORY_PAGE_SIZE);
   setEmptyState("hist-empty",rows.length>0);
-  qs("hist-body").innerHTML=pageRows.map(e=>`<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(profileByKey(e.profile).name)}</td><td>${escapeHtml(e.day)}</td><td>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</td><td class="mono">${escapeHtml(e.setNumber?`${e.setNumber}/${e.scheduledSets||"?"}`:"—")}</td><td class="mono">${escapeHtml(e.load??"—")}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td class="mono">${escapeHtml(e.rir??"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td><td><div class="btnrow">${e.ex!==COMPLETE_EX&&!e.isRest&&e.status!=="skipped"?`<button class="btn ghost small" data-edit-id="${escapeAttr(e.id)}">Edit</button>`:""}<button class="btn ghost small" data-delete-id="${escapeAttr(e.id)}">Del</button></div></td></tr>`).join("");
-  qs("hist-cards").innerHTML=pageRows.map(e=>`<div class="history-card"><div class="top"><div><h3>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</h3><div class="line">${escapeHtml(profileByKey(e.profile).name)} · ${escapeHtml(e.date)} · ${escapeHtml(e.day)}${e.setNumber?` · set ${escapeHtml(e.setNumber)}/${escapeHtml(e.scheduledSets||"?")}`:""} · ${escapeHtml(e.load??"—")}${e.load!=null?" kg":""} · reps ${escapeHtml(e.s1||"—")}</div><div class="line">${escapeHtml(e.notes||"")}</div></div><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></div><div class="btnrow" style="margin-top:10px">${e.ex!==COMPLETE_EX&&!e.isRest&&e.status!=="skipped"?`<button class="btn ghost" data-edit-id="${escapeAttr(e.id)}">Edit</button>`:""}<button class="btn ghost" data-delete-id="${escapeAttr(e.id)}">Delete</button></div></div>`).join("");
+  qs("hist-body").innerHTML=pageRows.map(e=>`<tr><td class="mono">${escapeHtml(e.date)}</td><td>${escapeHtml(e.day)}</td><td>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</td><td class="mono">${escapeHtml(e.setNumber?`${e.setNumber}/${e.scheduledSets||"?"}`:"—")}</td><td class="mono">${escapeHtml(e.load??"—")}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td class="mono">${escapeHtml(e.rir??"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td><td><div class="btnrow">${e.ex!==COMPLETE_EX&&!e.isRest&&e.status!=="skipped"?`<button class="btn ghost small" data-edit-id="${escapeAttr(e.id)}">Edit</button>`:""}<button class="btn ghost small" data-delete-id="${escapeAttr(e.id)}">Del</button></div></td></tr>`).join("");
+  qs("hist-cards").innerHTML=pageRows.map(e=>`<div class="history-card"><div class="top"><div><h3>${escapeHtml(e.ex===COMPLETE_EX?"Workout complete":e.ex)}</h3><div class="line">${escapeHtml(e.date)} · ${escapeHtml(e.day)}${e.setNumber?` · set ${escapeHtml(e.setNumber)}/${escapeHtml(e.scheduledSets||"?")}`:""} · ${escapeHtml(e.load??"—")}${e.load!=null?" kg":""} · reps ${escapeHtml(e.s1||"—")}</div><div class="line">${escapeHtml(e.notes||"")}</div></div><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></div><div class="btnrow" style="margin-top:10px">${e.ex!==COMPLETE_EX&&!e.isRest&&e.status!=="skipped"?`<button class="btn ghost" data-edit-id="${escapeAttr(e.id)}">Edit</button>`:""}<button class="btn ghost" data-delete-id="${escapeAttr(e.id)}">Delete</button></div></div>`).join("");
   qs("history-page").textContent=rows.length?`Page ${historyPage+1} of ${totalPages} · ${rows.length} entries`:"No entries";
   qs("history-prev").disabled=historyPage===0;
   qs("history-next").disabled=historyPage>=totalPages-1;
@@ -456,26 +458,22 @@ async function saveStrengthProfile(){
 }
 function renderTrash(){const rows=allEntries.filter(entry=>entry.deletedAt&&entry.profile===currentProfileKey);qs("trash-count").textContent=rows.length;qs("trash-list").innerHTML=rows.length?rows.slice(0,50).map(entry=>`<div class="warnbox"><b>${escapeHtml(entry.ex===COMPLETE_EX?"Workout complete":entry.ex)}</b> · ${escapeHtml(entry.date)}<div class="btnrow" style="margin-top:8px"><button class="btn small" data-restore-id="${escapeAttr(entry.id)}">Restore</button><button class="btn small bad" data-permanent-id="${escapeAttr(entry.id)}">Delete permanently</button></div></div>`).join(""):'<div class="empty"><p>Trash is empty.</p></div>'}
 function renderSchedule(){
-  qs("schedule-title").textContent=`${activeProfile().name} schedule`;
+  qs("schedule-title").textContent="48-hour rotation";
   qs("schedule-expected").textContent=`${activeSettings().expected_sessions_per_week} / week`;
   qs("schedule-grid").innerHTML=activeSchedule().map((d,index)=>`<div class="day-card ${index===nextDayIndex()?"current":""}"><div class="day-head"><div class="circle">${index+1}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.day)} · ${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}<small>${escapeHtml(e[3]||"")}</small></span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}<small>RIR ${escapeHtml(exerciseRir(e))}</small></span></div>`).join("")}</div>`).join("");
 }
 function renderSettings(){
-  qs("settings-profile").textContent=activeProfile().name;
   const u=usageEstimate();
   qs("usage-mb").textContent=u.mb.toFixed(2)+" MB";
   qs("usage-rows").textContent=u.rows;
   qs("usage-sub").textContent=`${u.pct.toFixed(2)}% of estimated free DB limit`;
   qs("usage-detail").className="warnbox "+u.level;
   qs("usage-detail").innerHTML=`<b>Usage estimate:</b> ${u.msg}<div class="bar"><span style="width:${u.pct}%"></span></div><br>Rows: ${u.rows}. Estimated size: ${u.mb.toFixed(2)} MB / 500 MB. This is a conservative estimate; exact database size requires Supabase dashboard access.`;
-  fillProfileSelects();
-  qs("edit-profile").value=editorProfileKey;
-  qs("edit-profile-tag").textContent=profileByKey(editorProfileKey).name;
+  qs("edit-profile-tag").textContent="48-hour rotation";
 }
-function loadEditorForProfile(key){
-  editorProfileKey=key;
+function loadEditorForProfile(key=PROFILE_KEY){
   const st=activeSettings(key); qs("edit-expected").value=st.expected_sessions_per_week;
-  qs("edit-profile-tag").textContent=profileByKey(key).name;
+  qs("edit-profile-tag").textContent="48-hour rotation";
   qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label for="ed-day-${idx}">Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}" maxlength="80"></div><div class="field"><label for="ed-title-${idx}">Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}" maxlength="120"></div><div class="field"><label for="ed-focus-${idx}">Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}" maxlength="120"></div></div><div class="field" style="margin-top:10px"><label for="ed-exs-${idx}">Exercises — name | sets | reps | joint action | stable ID | aliases | RIR</label><textarea id="ed-exs-${idx}" maxlength="20000">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", "),e[6]||""].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
 }
 function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||"",parts[4]||slugifyExercise(parts[0]),parts[5]?parts[5].split(",").map(x=>x.trim()).filter(Boolean):[],parts[6]||""]})}
@@ -490,7 +488,7 @@ async function saveEditedSchedule(){
   }catch(error){reportError("Could not save schedule",error)}
 }
 async function resetEditedSchedule(){
-  if(!confirm("Reset this profile schedule to its default?")) return;
+  if(!await requestConfirmation({title:"Reset training plan?",message:"Your customised schedule will be replaced by the default 48-hour rotation.",confirmLabel:"Reset plan"})) return;
   try{
     const p=profileByKey(editorProfileKey); const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
     await upsertProfileSettings(row);
@@ -518,7 +516,7 @@ function entryToRow(entry){
 async function importBackup(file){
   try{
     const data=validateBackup(JSON.parse(await file.text()));
-    if(!confirm(`Import ${(data.entries||[]).length} workout entries? Existing matching records will be updated. Legacy daily check-ins are intentionally ignored.`))return;
+    if(!await requestConfirmation({title:"Import backup?",message:`Import ${(data.entries||[]).length} workout entries? Existing matching records will be updated. Legacy daily check-ins are ignored.`,confirmLabel:"Import backup",danger:false}))return;
     const profiles=Object.values(data.profiles||{}).filter(item=>item?.profile_key&&validProfileKey(item.profile_key)).map(item=>({user_id:user.id,profile_key:item.profile_key,display_name:String(item.display_name||profileByKey(item.profile_key).name).slice(0,120),expected_sessions_per_week:boundedNumber(item.expected_sessions_per_week,0,14,false),schedule_json:normalizeSchedule(item.schedule_json),strength_sex:["male","female"].includes(item.strength_sex)?item.strength_sex:null,body_weight_kg:boundedNumber(item.body_weight_kg,20,400)}));
     if(profiles.length){const {error}=await supabaseClient.from("profile_settings").upsert(profiles,{onConflict:"user_id,profile_key"});if(error)throw error}
     const rows=(data.entries||[]).map(entryToRow);for(let index=0;index<rows.length;index+=100){const {error}=await supabaseClient.from("workout_entries").upsert(rows.slice(index,index+100),{onConflict:"id"});if(error)throw error}
@@ -528,7 +526,7 @@ async function importBackup(file){
 
 function renderAll(){
   if(!user) return;
-  renderProfilePicker(); fillProfileSelects(); fillDaySelect(); renderDashboard(); renderLoads(); renderHistory(); renderSchedule(); renderSettings(); if(qs("schedule-editor").innerHTML==="") loadEditorForProfile(editorProfileKey);
+  fillDaySelect(); renderDashboard(); renderLoads(); renderHistory(); renderSchedule(); renderSettings(); if(qs("schedule-editor").innerHTML==="") loadEditorForProfile();
 }
 function selectedExercise(day=qs("log-day").value,key=currentProfileKey){return scheduleByDay(day,key).exs.find(e=>stableExerciseId(e)===qs("log-ex").value)}
 function rangeForExercise(day=qs("log-day").value,key=currentProfileKey){const exercise=selectedExercise(day,key);return normalizeRange(exercise?.[2])||guessedRangeFor(exercise?.[0]||"")}
@@ -540,8 +538,8 @@ const ACTIONS = {
   "reset-password":resetPassword,
   "update-password":updateRecoveredPassword,
   "sign-out":signOut,
-  "hide-profile-picker":hideProfilePicker,
-  "show-profile-picker":showProfilePicker,
+  "confirm-cancel":()=>closeConfirmation(false),
+  "confirm-accept":()=>closeConfirmation(true),
   "refresh":loadAllData,
   "add-entry":addEntry,
   "skip-set":skipSet,
@@ -569,7 +567,6 @@ async function handleClick(event){
     const button=event.target.closest("button");
     if(!button)return;
     if(button.dataset.page){showPage(button.dataset.page);return}
-    if(button.dataset.profile){switchProfile(button.dataset.profile,true);return}
     if(button.dataset.filter){histFilter=button.dataset.filter;historyPage=0;renderHistory();return}
     if(button.dataset.timer){startRestTimer(Number(button.dataset.timer));return}
     if(button.dataset.deleteId){await deleteEntry(button.dataset.deleteId);return}
@@ -585,15 +582,13 @@ async function handleClick(event){
 function bindEvents(){
   document.addEventListener("click",handleClick);
   qs("login-password").addEventListener("keydown",event=>{if(event.key==="Enter")signInPassword()});
-  qs("log-profile").addEventListener("change",event=>switchProfile(event.target.value));
   qs("log-day").addEventListener("change",fillExercisesForDay);
   qs("log-ex").addEventListener("change",setExerciseDefaults);
-  qs("edit-profile").addEventListener("change",event=>loadEditorForProfile(event.target.value));
   qs("progress-exercise").addEventListener("change",renderProgress);
   qs("progress-metric").addEventListener("change",renderProgress);
   ["log-load","log-s1","log-rir","log-notes","log-set-type"].forEach(id=>qs(id).addEventListener("input",saveLogDraft));
   qs("import-file").addEventListener("change",event=>{const file=event.target.files?.[0];if(file)importBackup(file)});
-  document.addEventListener("keydown",event=>{if(event.key==="Escape"&&qs("profile-screen").classList.contains("show"))hideProfilePicker()});
+  document.addEventListener("keydown",event=>{if(event.key==="Escape"&&qs("confirm-dialog").classList.contains("show"))closeConfirmation(false)});
 }
 
 function logDraftKey(){return `divinity-log-draft:${currentProfileKey}:${qs("log-day")?.value||"day"}`}

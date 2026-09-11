@@ -8,13 +8,14 @@ const html = readFileSync(join(root, "index.html"), "utf8");
 const css = readFileSync(join(root, "styles.css"), "utf8");
 const app = readFileSync(join(root, "app.js"), "utf8");
 const serviceWorker = readFileSync(join(root, "sw.js"), "utf8");
+const headers = readFileSync(join(root, "_headers"), "utf8");
 
 test("login uses the verified video with accessible motion fallback", () => {
   assert.match(html, /class="login-video" muted loop playsinline preload="metadata"/);
   assert.match(html, /supabase-js@2\.110\.7"[^>]+defer/);
   assert.match(html, /\.\/media\/login-background\.mp4/);
   assert.match(app, /video\.play\(\)\.catch/);
-  assert.match(css, /\.auth,.profile-screen\{[^}]*align-items:center;justify-content:center/);
+  assert.match(css, /\.auth,.confirm-dialog\{[^}]*align-items:center;justify-content:center/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)[\s\S]*\.login-video\{display:none\}/);
   assert.match(serviceWorker, /url\.pathname\.endsWith\("\.mp4"\)/);
 });
@@ -28,18 +29,39 @@ test("saved schedule changes refresh editable day controls", () => {
 });
 
 test("offline install does not depend on the external Supabase CDN", () => {
-  assert.match(serviceWorker, /const CACHE = "divinity-v8"/);
+  assert.match(serviceWorker, /const CACHE = "divinity-v9"/);
   const shell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\];/)?.[1] || "";
   assert.doesNotMatch(shell, /SUPABASE_CDN/);
   assert.match(serviceWorker, /event\.waitUntil\(caches\.open\(CACHE\)\.then\(cache => cache\.put/);
 });
 
 test("forms and modal status are accessible", () => {
-  for (const id of ["log-profile", "log-day", "log-ex", "log-load", "log-s1", "log-rir", "log-range", "log-notes", "progress-exercise", "progress-metric", "strength-sex", "strength-bodyweight", "edit-profile", "edit-expected"]) {
+  for (const id of ["log-day", "log-ex", "log-load", "log-s1", "log-rir", "log-range", "log-notes", "progress-exercise", "progress-metric", "strength-sex", "strength-bodyweight", "edit-expected"]) {
     assert.match(html, new RegExp(`<label for="${id}">`));
   }
   assert.match(html, /id="auth-msg"[^>]+aria-live="polite"/);
   assert.match(app, /element\.inert=!!modal/);
+});
+
+test("confirmation actions use an accessible in-app dialog", () => {
+  assert.match(html, /id="confirm-dialog"[^>]+role="dialog"[^>]+aria-modal="true"/);
+  assert.match(app, /requestConfirmation/);
+  assert.doesNotMatch(app, /\bconfirm\s*\(/);
+  assert.match(app, /event\.key==="Escape"[\s\S]*closeConfirmation\(false\)/);
+});
+
+test("the interface exposes only one workout profile", () => {
+  assert.doesNotMatch(html, /log-profile|edit-profile"|profile-screen|Switch profile|Choose profile/);
+  assert.doesNotMatch(app, /showProfilePicker|switchProfile|dataset\.profile/);
+  assert.match(app, /const PROFILE_KEY = PROFILE\.key/);
+});
+
+test("Cloudflare responses use security headers", () => {
+  assert.match(headers, /Content-Security-Policy:/);
+  assert.match(headers, /frame-ancestors 'none'/);
+  assert.match(headers, /X-Content-Type-Options: nosniff/);
+  assert.match(headers, /X-Frame-Options: DENY/);
+  assert.match(headers, /Permissions-Policy:/);
 });
 
 test("daily body-weight check-in is removed without a destructive data migration", () => {

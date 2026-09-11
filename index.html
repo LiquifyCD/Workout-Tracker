@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#050507">
+  <meta name="theme-color" content="#130b24">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>Divinity — 48-Hour Rotation</title>
 
@@ -47,21 +47,10 @@
     </div>
   </div>
 
-  <div id="profile-screen" class="profile-screen" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-    <div class="profile-card">
-      <div class="sigil" style="margin-bottom:16px"></div>
-      <h1 id="profile-title">Choose profile</h1>
-      <div id="profile-grid" class="profile-grid"></div>
-      <div class="btnrow" style="margin-top:14px"><button class="btn ghost" data-action="hide-profile-picker">Keep current</button><button class="btn bad" data-action="sign-out">Logout</button></div>
-    </div>
-  </div>
-
   <header class="topbar">
-    <div class="brand"><div class="sigil"></div><div><h1>Divinity</h1><p id="brand-sub">Group training tracker</p></div></div>
+    <div class="brand"><div class="sigil"></div><div><h1>Divinity</h1><p id="brand-sub">Workout tracker</p></div></div>
     <nav id="desktop-nav" class="nav" aria-label="Primary navigation"></nav>
     <div class="account-actions">
-      <button class="mini-btn" id="active-profile-btn" data-action="show-profile-picker">Profile</button>
-
       <button class="mini-btn danger" data-action="sign-out">Logout</button>
     </div>
     <div class="sync" aria-live="polite"><span id="sync-dot" class="dot"></span><span id="sync-text">Loading</span></div>
@@ -74,7 +63,7 @@
           <div class="eyebrow"><span id="today-date">Today</span><span id="today-day">Day 1 of 6</span></div>
           <h2 id="today-title">Upper · Chest priority</h2>
           <p id="today-focus">15 sets · ~60 min</p>
-          <div class="today-profile"><span id="today-profile">Alfred</span><span id="today-progress-label">0 of 15 sets</span></div>
+          <div class="today-profile"><span id="today-profile">48-hour rotation</span><span id="today-progress-label">0 of 15 sets</span></div>
           <div class="session-progress" aria-hidden="true"><span id="today-progress-bar"></span></div>
         </div>
         <div class="current-exercise-panel">
@@ -91,7 +80,7 @@
       <div class="exercise-track" id="next-card"></div>
 
       <div class="section"><h2>Recent entries</h2><button class="btn ghost" data-action="refresh">Refresh</button></div>
-      <div class="card tablewrap"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Decision</th></tr></thead><tbody id="recent-body"></tbody></table><div id="recent-empty" class="empty"><h3>No logs yet</h3><p>Go to Log and save the first set.</p></div></div>
+      <div class="card tablewrap"><table><thead><tr><th>Date</th><th>Day</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Decision</th></tr></thead><tbody id="recent-body"></tbody></table><div id="recent-empty" class="empty"><h3>No logs yet</h3><p>Go to Log and save the first set.</p></div></div>
     </section>
 
     <section id="page-log" class="page">
@@ -106,7 +95,6 @@
         <details class="workout-picker">
           <summary>Change workout or exercise</summary>
           <div class="formgrid picker-grid">
-          <div class="field"><label for="log-profile">Profile</label><select id="log-profile"></select></div>
           <div class="field"><label for="log-day">Loop day</label><select id="log-day"></select></div>
           </div>
           <div class="field" style="margin-top:12px"><label for="log-ex">Exercise</label><select id="log-ex"></select></div>
@@ -134,7 +122,7 @@
     </section>
 
     <section id="page-history" class="page">
-      <div class="section"><h2>History</h2><button class="btn bad" data-action="clear-profile-data">Move profile data to trash</button></div>
+      <div class="section"><h2>History</h2><button class="btn bad" data-action="clear-profile-data">Move workout data to trash</button></div>
       <div class="card pad">
         <div class="formgrid three"><div class="field"><label for="progress-exercise">Progress exercise</label><select id="progress-exercise"></select></div><div class="field"><label for="progress-metric">Chart metric</label><select id="progress-metric"><option value="load">Weight</option><option value="reps">Reps</option><option value="volume">Volume</option><option value="e1rm">Estimated 1RM</option></select></div><div class="stat compact"><div class="label">Personal record</div><div class="value" id="progress-pr">—</div><div class="sub" id="progress-pr-date"></div></div></div>
         <div class="progress-metrics">
@@ -148,14 +136,14 @@
       <div class="card pad">
         <div class="formgrid three">
           <div class="field"><label for="strength-sex">Reference</label><select id="strength-sex"><option value="">Choose</option><option value="male">Men</option><option value="female">Women</option></select></div>
-          <div class="field"><label for="strength-bodyweight">Profile body weight kg</label><input id="strength-bodyweight" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" maxlength="6" placeholder="75"></div>
-          <div class="field field-action"><button class="btn primary" data-action="save-strength-profile">Save profile values</button></div>
+          <div class="field"><label for="strength-bodyweight">Body weight kg</label><input id="strength-bodyweight" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" maxlength="6" placeholder="75"></div>
+          <div class="field field-action"><button class="btn primary" data-action="save-strength-profile">Save values</button></div>
         </div>
         <div id="strength-result" class="strength-result" aria-live="polite"></div>
         <p class="meta">Levels: Beginner, Novice, Intermediate, Advanced, Elite. Data: Strength Level community standards, checked 2026-07-28. Warm-ups are excluded. Unsupported machine or ambiguous variations are labelled explicitly.</p>
       </div>
       <div class="filters" id="filters"></div>
-      <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Profile</th><th>Day</th><th>Exercise</th><th>Set</th><th>Load</th><th>Reps</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
+      <div class="card tablewrap desktop-table history"><table><thead><tr><th>Date</th><th>Day</th><th>Exercise</th><th>Set</th><th>Load</th><th>Reps</th><th>RIR</th><th>Decision</th><th></th></tr></thead><tbody id="hist-body"></tbody></table><div id="hist-empty" class="empty"><h3>No history</h3></div></div>
       <div class="stack" id="hist-cards"></div>
       <div class="section history-pagination"><button id="history-prev" class="btn ghost" data-action="history-prev">Previous</button><span id="history-page" class="meta" aria-live="polite"></span><button id="history-next" class="btn ghost" data-action="history-next">Next</button></div>
       <div class="section"><h2>Trash</h2><span class="tag" id="trash-count">0</span></div>
@@ -170,10 +158,9 @@
     <section id="page-settings" class="page">
       <div class="section"><div><h2>Settings</h2><p class="meta">Manage your training plan, data, and account.</p></div></div>
 
-      <div class="section settings-section"><h2>Training plan</h2><span class="tag" id="edit-profile-tag">Profile</span></div>
+      <div class="section settings-section"><h2>Training plan</h2><span class="tag" id="edit-profile-tag">48-hour rotation</span></div>
       <div class="card pad">
-        <div class="formgrid">
-          <div class="field"><label for="edit-profile">Profile</label><select id="edit-profile"></select></div>
+        <div class="formgrid single-setting">
           <div class="field"><label for="edit-expected">Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>
         </div>
         <div id="schedule-editor" class="stack" style="margin-top:12px"></div>
@@ -194,8 +181,8 @@
 
       <div class="section settings-section"><h2>Account</h2></div>
       <div class="card pad account-panel">
-        <div><div class="label">Selected profile</div><div class="account-profile" id="settings-profile">Alfred</div></div>
-        <div class="btnrow"><button class="btn" data-action="show-profile-picker">Switch profile</button><button class="btn bad" data-action="sign-out">Logout</button></div>
+        <div><div class="label">Authenticated account</div><div class="account-profile">Workout data is private to your login</div></div>
+        <div class="btnrow"><button class="btn bad" data-action="sign-out">Logout</button></div>
       </div>
     </section>
   </main>
@@ -206,6 +193,15 @@
   <div id="connection-banner" class="status-banner" role="status" hidden>You are offline. Saved data remains visible; syncing resumes online.</div>
   <div id="update-banner" class="status-banner update" role="status" hidden>New version available. <button class="btn small primary" data-action="apply-update">Update now</button></div>
   <div id="undo-bar" class="status-banner update" role="status" hidden>Entry moved to trash. <button class="btn small" data-action="undo-delete">Undo</button></div>
+
+  <div id="confirm-dialog" class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+    <div class="confirm-card">
+      <div class="confirm-icon" aria-hidden="true">!</div>
+      <h2 id="confirm-title">Confirm action</h2>
+      <p id="confirm-message"></p>
+      <div class="btnrow confirm-actions"><button class="btn ghost" data-action="confirm-cancel">Cancel</button><button id="confirm-accept" class="btn bad" data-action="confirm-accept">Confirm</button></div>
+    </div>
+  </div>
 
 <script src="./data/programs.js" defer></script>
 <script src="./core.js" defer></script>

@@ -2,7 +2,7 @@
 
 Installable workout PWA deployed on Cloudflare Workers, using Supabase Auth and Postgres persistence.
 
-The active programme is the six-day 48-hour rotation from `48-Hour-Rotation.pdf`. The dashboard highlights today's rotation day, current exercise, prescribed sets/reps/RIR, and set progress.
+The active programme is the six-day 48-hour rotation from `48-Hour-Rotation.pdf`. The dashboard highlights today's rotation day, current exercise, prescribed sets/reps/RIR, and set progress. The interface uses one workout profile; legacy rows under other profile keys are left untouched.
 
 ## Tracking
 
@@ -25,7 +25,7 @@ Supported exact movements:
 - Incline bench press
 - Shoulder/overhead press
 
-The app estimates 1RM with the Epley formula, divides it by profile body weight, and compares that ratio with the selected men's or women's reference. Levels are Beginner, Novice, Intermediate, Advanced, and Elite. Warm-ups are excluded. Machine exercises and ambiguous combinations such as “leg press / squat” are shown as unsupported rather than treated as equivalent.
+The app estimates 1RM with the Epley formula, divides it by body weight, and compares that ratio with the selected men's or women's reference. Levels are Beginner, Novice, Intermediate, Advanced, and Elite. Warm-ups are excluded. Machine exercises and ambiguous combinations such as “leg press / squat” are shown as unsupported rather than treated as equivalent.
 
 Reference tables were checked on 2026-07-28:
 
