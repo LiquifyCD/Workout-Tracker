@@ -29,7 +29,7 @@ test("saved schedule changes refresh editable day controls", () => {
 });
 
 test("offline install does not depend on the external Supabase CDN", () => {
-  assert.match(serviceWorker, /const CACHE = "divinity-v9"/);
+  assert.match(serviceWorker, /const CACHE = "divinity-v10"/);
   const shell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\];/)?.[1] || "";
   assert.doesNotMatch(shell, /SUPABASE_CDN/);
   assert.match(serviceWorker, /event\.waitUntil\(caches\.open\(CACHE\)\.then\(cache => cache\.put/);

@@ -54,10 +54,11 @@ function stableEntryExerciseId(name,explicitId){const derived=slugifyExercise(na
 function activeProfile(){return PROFILE}
 function activeSettings(key=currentProfileKey){return profileSettings[key] || {...profileByKey(key), schedule_json: profileByKey(key).defaultSchedule, expected_sessions_per_week: profileByKey(key).defaultExpected}}
 function activeSchedule(key=currentProfileKey){return activeSettings(key).schedule_json || profileByKey(key).defaultSchedule}
-function isCurrentRotation(schedule){return Array.isArray(schedule)&&schedule.length===6&&schedule.every((day,index)=>day.id===`rotation-day-${index+1}`)}
+function isSupersededRotation(schedule){return Array.isArray(schedule)&&schedule.some(day=>String(day?.id||"").startsWith("rotation-day-"))}
 function humanDate(){return new Intl.DateTimeFormat("en",{weekday:"long",month:"short",day:"numeric"}).format(new Date())}
-function exerciseRir(exercise){return exercise?.[6]||"as prescribed"}
-function rirForSet(exercise,setNumber=1){const values=exerciseRir(exercise).split("/").map(value=>value.trim()).filter(Boolean);return values[Math.min(setNumber-1,values.length-1)]||values[0]||"—"}
+function exerciseRir(exercise){return exercise?.[6]||""}
+function rirForSet(exercise,setNumber=1){const values=exerciseRir(exercise).split("/").map(value=>value.trim()).filter(Boolean);return values[Math.min(setNumber-1,values.length-1)]||values[0]||""}
+function rirText(exercise,setNumber=1){const rir=rirForSet(exercise,setNumber);return rir?` · RIR ${rir}`:""}
 function toast(msg,type=""){const t=qs("toast");clearTimeout(toastTimer);t.textContent=msg;t.className=`toast ${type} show`.trim();toastTimer=setTimeout(()=>{t.className="toast"},type==="error"?5000:2500)}
 function setSync(status,msg){const d=qs("sync-dot"), s=qs("sync-text"); d.className="dot "+(status||""); s.textContent=msg;}
 function reportError(context,error){
@@ -156,7 +157,7 @@ async function checkAuth(){
 
 async function ensureProfileSettings(){
   for(const p of [PROFILE]){
-    if(profileSettings[p.key]&&isCurrentRotation(profileSettings[p.key].schedule_json)) continue;
+    if(profileSettings[p.key]&&!isSupersededRotation(profileSettings[p.key].schedule_json)) continue;
     const existing=profileSettings[p.key]||{};
     const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule,strength_sex:existing.strength_sex||null,body_weight_kg:existing.body_weight_kg??null};
     const saved=await upsertProfileSettings(row);
@@ -266,7 +267,7 @@ function plannedSlotForExercise(exerciseId,dayRef=qs("log-day").value,key=curren
 function nextExerciseForDay(dayRef,key=currentProfileKey){return currentPlannedSlot(dayRef,key)?.exerciseId||stableExerciseId(scheduleByDay(dayRef,key).exs[0])}
 function renderWorkoutPlan(){
   const slots=workoutPlan(),current=currentPlannedSlot(),day=scheduleByDay(qs("log-day").value),done=slots.filter(slot=>slot.entry).length;
-  qs("workout-plan").innerHTML=`<div class="eyebrow">Today's session</div><div class="set-plan-head"><strong>${done} / ${slots.length} sets</strong></div><div class="set-plan-list">${slots.map(slot=>{const target=normalizeRange(slot.exercise[2]);const result=slot.entry?.status==="skipped"?"Skipped":slot.entry?`${slot.entry.load} kg × ${slot.entry.s1} reps`:`Target ${target} reps · RIR ${rirForSet(slot.exercise,slot.number)}`;return `<button class="set-chip ${slot.entry?slot.entry.status==="skipped"?"skipped":"complete":current===slot?"current":""}" data-plan-exercise="${escapeAttr(slot.exerciseId)}" ${slot.entry?"disabled":""}><span>${escapeHtml(slot.exercise[0])}</span><small>Set ${slot.number}/${slot.total}${slot.optional?" · optional":""} · ${escapeHtml(result)}</small></button>`}).join("")}</div>`;
+  qs("workout-plan").innerHTML=`<div class="eyebrow">Today's session</div><div class="set-plan-head"><strong>${done} / ${slots.length} sets</strong></div><div class="set-plan-list">${slots.map(slot=>{const target=normalizeRange(slot.exercise[2]);const result=slot.entry?.status==="skipped"?"Skipped":slot.entry?`${slot.entry.load} kg × ${slot.entry.s1} reps`:`Target ${target} reps${rirText(slot.exercise,slot.number)}`;return `<button class="set-chip ${slot.entry?slot.entry.status==="skipped"?"skipped":"complete":current===slot?"current":""}" data-plan-exercise="${escapeAttr(slot.exerciseId)}" ${slot.entry?"disabled":""}><span>${escapeHtml(slot.exercise[0])}</span><small>Set ${slot.number}/${slot.total}${slot.optional?" · optional":""} · ${escapeHtml(result)}</small></button>`}).join("")}</div>`;
   renderLogContext(day,slots,current);
 }
 function renderLogContext(day= scheduleByDay(qs("log-day").value),slots=workoutPlan(),current=currentPlannedSlot()){
@@ -274,7 +275,7 @@ function renderLogContext(day= scheduleByDay(qs("log-day").value),slots=workoutP
   const selectedSlot=plannedSlotForExercise(stableExerciseId(exercise))||current,index=day.exs.findIndex(item=>stableExerciseId(item)===stableExerciseId(exercise)),done=slots.filter(slot=>slot.entry).length;
   qs("log-day-title").textContent=`${day.day} · ${day.type}`;qs("log-current-exercise").textContent=exercise[0];qs("log-joint-action").textContent=exercise[3]||"";
   qs("log-set-step").textContent=selectedSlot?`Set ${selectedSlot.number} / ${selectedSlot.total}`:"All sets done";qs("log-exercise-step").textContent=`exercise ${index+1} of ${day.exs.length}`;
-  qs("log-prescription").textContent=selectedSlot?`${exercise[2]} reps · RIR ${rirForSet(exercise,selectedSlot.number)}`:`${exercise[1]} sets · ${exercise[2]} reps`;
+  qs("log-prescription").textContent=selectedSlot?`${exercise[2]} reps${rirText(exercise,selectedSlot.number)}`:`${exercise[1]} sets · ${exercise[2]} reps`;
   qs("log-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;
   if(selectedSlot)qs("log-rir").placeholder=rirForSet(exercise,selectedSlot.number).replace("—","");
 }
@@ -388,13 +389,13 @@ function usageEstimate(){
 function renderDashboard(){
   const n=activeSchedule()[nextDayIndex()],slots=workoutPlan(n.id),current=currentPlannedSlot(n.id),done=slots.filter(slot=>slot.entry).length,currentExercise=current?.exercise||n.exs.at(-1);
   qs("brand-sub").textContent="Workout tracker";
-  qs("today-date").textContent=humanDate();qs("today-day").textContent=`${n.day} of ${activeSchedule().length}`;qs("today-title").textContent=n.title;qs("today-focus").textContent=n.focus;qs("today-profile").textContent="48-hour rotation";qs("today-progress-label").textContent=`${done} of ${slots.length} sets`;qs("today-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;qs("today-current-exercise").textContent=current?currentExercise[0]:"Workout ready to complete";qs("today-prescription").textContent=current?`Set ${current.number} of ${current.total} · ${currentExercise[2]} reps · RIR ${rirForSet(currentExercise,current.number)}`:"All prescribed sets handled";
+  qs("today-date").textContent=humanDate();qs("today-day").textContent=`${n.day} of ${activeSchedule().length}`;qs("today-title").textContent=n.title;qs("today-focus").textContent=n.focus;qs("today-profile").textContent="Training plan";qs("today-progress-label").textContent=`${done} of ${slots.length} sets`;qs("today-progress-bar").style.width=`${Math.round(done/Math.max(1,slots.length)*100)}%`;qs("today-current-exercise").textContent=current?currentExercise[0]:"Workout ready to complete";qs("today-prescription").textContent=current?`Set ${current.number} of ${current.total} · ${currentExercise[2]} reps${rirText(currentExercise,current.number)}`:"All prescribed sets handled";
   qs("next-tag").textContent=n.type;
   const u=usageEstimate();
   qs("usage-alert").style.display=u.level==="ok"?"none":"block";
   qs("usage-alert").className="warnbox "+u.level;
   qs("usage-alert").innerHTML=`<b>Storage alert:</b> ${u.msg} Estimated database use: ${u.mb.toFixed(2)} MB / 500 MB.`;
-  qs("next-card").innerHTML=n.exs.map((exercise,index)=>{const id=stableExerciseId(exercise),exerciseSlots=slots.filter(slot=>slot.exerciseId===id),exerciseDone=exerciseSlots.filter(slot=>slot.entry).length,isCurrent=current?.exerciseId===id;return `<button class="track-exercise ${exerciseDone===exerciseSlots.length?"done":""} ${isCurrent?"current":""}" data-day-id="${escapeAttr(n.id)}" data-plan-exercise="${escapeAttr(id)}"><span class="track-number">${exerciseDone===exerciseSlots.length?"✓":index+1}</span><span class="track-copy"><strong>${escapeHtml(exercise[0])}</strong><small>${escapeHtml(exercise[3])}</small></span><span class="track-prescription">${exerciseDone}/${exerciseSlots.length} sets<small>${escapeHtml(exercise[2])} reps · RIR ${escapeHtml(exerciseRir(exercise))}</small></span></button>`}).join("");
+  qs("next-card").innerHTML=n.exs.map((exercise,index)=>{const id=stableExerciseId(exercise),exerciseSlots=slots.filter(slot=>slot.exerciseId===id),exerciseDone=exerciseSlots.filter(slot=>slot.entry).length,isCurrent=current?.exerciseId===id;return `<button class="track-exercise ${exerciseDone===exerciseSlots.length?"done":""} ${isCurrent?"current":""}" data-day-id="${escapeAttr(n.id)}" data-plan-exercise="${escapeAttr(id)}"><span class="track-number">${exerciseDone===exerciseSlots.length?"✓":index+1}</span><span class="track-copy"><strong>${escapeHtml(exercise[0])}</strong><small>${escapeHtml(exercise[3])}</small></span><span class="track-prescription">${exerciseDone}/${exerciseSlots.length} sets<small>${escapeHtml(exercise[2])} reps${exerciseRir(exercise)?` · RIR ${escapeHtml(exerciseRir(exercise))}`:""}</small></span></button>`}).join("");
   const recent=setEntries().slice(0,8); setEmptyState("recent-empty",recent.length>0); qs("recent-body").innerHTML=recent.map(rowHtml).join("");
 }
 function rowHtml(e){return `<tr><td class="mono">${escapeHtml(e.date)}</td><td><span class="tag">${escapeHtml(e.day)}</span></td><td>${escapeHtml(e.ex)}</td><td class="mono">${escapeHtml(e.load??"—")}${e.load!=null?" kg":""}</td><td class="mono">${escapeHtml(e.s1||"—")}</td><td><span class="badge ${decisionClass(e.decision)}">${escapeHtml(e.decision)}</span></td></tr>`}
@@ -458,9 +459,9 @@ async function saveStrengthProfile(){
 }
 function renderTrash(){const rows=allEntries.filter(entry=>entry.deletedAt&&entry.profile===currentProfileKey);qs("trash-count").textContent=rows.length;qs("trash-list").innerHTML=rows.length?rows.slice(0,50).map(entry=>`<div class="warnbox"><b>${escapeHtml(entry.ex===COMPLETE_EX?"Workout complete":entry.ex)}</b> · ${escapeHtml(entry.date)}<div class="btnrow" style="margin-top:8px"><button class="btn small" data-restore-id="${escapeAttr(entry.id)}">Restore</button><button class="btn small bad" data-permanent-id="${escapeAttr(entry.id)}">Delete permanently</button></div></div>`).join(""):'<div class="empty"><p>Trash is empty.</p></div>'}
 function renderSchedule(){
-  qs("schedule-title").textContent="48-hour rotation";
+  qs("schedule-title").textContent="Training plan";
   qs("schedule-expected").textContent=`${activeSettings().expected_sessions_per_week} / week`;
-  qs("schedule-grid").innerHTML=activeSchedule().map((d,index)=>`<div class="day-card ${index===nextDayIndex()?"current":""}"><div class="day-head"><div class="circle">${index+1}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.day)} · ${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}<small>${escapeHtml(e[3]||"")}</small></span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}<small>RIR ${escapeHtml(exerciseRir(e))}</small></span></div>`).join("")}</div>`).join("");
+  qs("schedule-grid").innerHTML=activeSchedule().map((d,index)=>`<div class="day-card ${index===nextDayIndex()?"current":""}"><div class="day-head"><div class="circle">${index+1}</div><div><h3>${escapeHtml(d.title)}</h3><p>${escapeHtml(d.day)} · ${escapeHtml(d.focus||d.type)}</p></div></div>${d.exs.map(e=>`<div class="exrow"><span>${escapeHtml(e[0])}<small>${escapeHtml(e[3]||"")}</small></span><span>${escapeHtml(e[1])} × ${escapeHtml(e[2])}<small>${exerciseRir(e)?`RIR ${escapeHtml(exerciseRir(e))}`:""}</small></span></div>`).join("")}</div>`).join("");
 }
 function renderSettings(){
   const u=usageEstimate();
@@ -469,11 +470,11 @@ function renderSettings(){
   qs("usage-sub").textContent=`${u.pct.toFixed(2)}% of estimated free DB limit`;
   qs("usage-detail").className="warnbox "+u.level;
   qs("usage-detail").innerHTML=`<b>Usage estimate:</b> ${u.msg}<div class="bar"><span style="width:${u.pct}%"></span></div><br>Rows: ${u.rows}. Estimated size: ${u.mb.toFixed(2)} MB / 500 MB. This is a conservative estimate; exact database size requires Supabase dashboard access.`;
-  qs("edit-profile-tag").textContent="48-hour rotation";
+  qs("edit-profile-tag").textContent="Training plan";
 }
 function loadEditorForProfile(key=PROFILE_KEY){
   const st=activeSettings(key); qs("edit-expected").value=st.expected_sessions_per_week;
-  qs("edit-profile-tag").textContent="48-hour rotation";
+  qs("edit-profile-tag").textContent="Training plan";
   qs("schedule-editor").innerHTML=(st.schedule_json||[]).map((d,idx)=>`<div class="warnbox"><div class="formgrid"><div class="field"><label for="ed-day-${idx}">Day label</label><input id="ed-day-${idx}" value="${escapeAttr(d.day)}" maxlength="80"></div><div class="field"><label for="ed-title-${idx}">Day title</label><input id="ed-title-${idx}" value="${escapeAttr(d.title)}" maxlength="120"></div><div class="field"><label for="ed-focus-${idx}">Type / focus</label><input id="ed-focus-${idx}" value="${escapeAttr(d.focus||d.type||"")}" maxlength="120"></div></div><div class="field" style="margin-top:10px"><label for="ed-exs-${idx}">Exercises — name | sets | reps | joint action | stable ID | aliases | RIR</label><textarea id="ed-exs-${idx}" maxlength="20000">${escapeHtml((d.exs||[]).map(e=>[e[0],e[1],e[2],e[3],stableExerciseId(e),(e[5]||[]).join(", "),e[6]||""].join(" | ")).join("\n"))}</textarea></div></div>`).join("");
 }
 function parseExerciseLines(text){return text.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const parts=l.split("|").map(x=>x.trim());return [parts[0]||"Exercise",parts[1]||"1",parts[2]||"6–10",parts[3]||"",parts[4]||slugifyExercise(parts[0]),parts[5]?parts[5].split(",").map(x=>x.trim()).filter(Boolean):[],parts[6]||""]})}
@@ -488,7 +489,7 @@ async function saveEditedSchedule(){
   }catch(error){reportError("Could not save schedule",error)}
 }
 async function resetEditedSchedule(){
-  if(!await requestConfirmation({title:"Reset training plan?",message:"Your customised schedule will be replaced by the default 48-hour rotation.",confirmLabel:"Reset plan"})) return;
+  if(!await requestConfirmation({title:"Reset training plan?",message:"Your customised schedule will be replaced by the default training plan.",confirmLabel:"Reset plan"})) return;
   try{
     const p=profileByKey(editorProfileKey); const row={user_id:user.id,profile_key:p.key,display_name:p.name,expected_sessions_per_week:p.defaultExpected,schedule_json:p.defaultSchedule};
     await upsertProfileSettings(row);

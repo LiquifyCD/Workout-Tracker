@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#130b24">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-  <title>Divinity — 48-Hour Rotation</title>
+  <title>Divinity — Training Tracker</title>
 
   <link rel="icon" href="./favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
@@ -63,13 +63,13 @@
           <div class="eyebrow"><span id="today-date">Today</span><span id="today-day">Day 1 of 6</span></div>
           <h2 id="today-title">Upper · Chest priority</h2>
           <p id="today-focus">15 sets · ~60 min</p>
-          <div class="today-profile"><span id="today-profile">48-hour rotation</span><span id="today-progress-label">0 of 15 sets</span></div>
+          <div class="today-profile"><span id="today-profile">Training plan</span><span id="today-progress-label">0 of 0 sets</span></div>
           <div class="session-progress" aria-hidden="true"><span id="today-progress-bar"></span></div>
         </div>
         <div class="current-exercise-panel">
           <span class="eyebrow-label">Current exercise</span>
           <h3 id="today-current-exercise">Smith machine incline press</h3>
-          <div class="prescription" id="today-prescription">Set 1 of 2 · 4–6 reps · RIR 1</div>
+          <div class="prescription" id="today-prescription">Set 1 of 2 · 4–7 reps</div>
           <button class="btn primary hero-action" data-page="log">Start workout</button>
         </div>
       </section>
@@ -88,7 +88,7 @@
         <div><div class="eyebrow" id="log-day-title">Day 1 · Upper</div><h2 id="log-current-exercise">Current exercise</h2><p id="log-joint-action" class="meta"></p></div>
         <div class="session-count"><strong id="log-set-step">Set 1 / 2</strong><span id="log-exercise-step">exercise 1 of 9</span></div>
       </div>
-      <div class="prescription-banner" id="log-prescription">4–6 reps · RIR 1</div>
+      <div class="prescription-banner" id="log-prescription">4–7 reps</div>
       <div class="session-progress log-progress" aria-hidden="true"><span id="log-progress-bar"></span></div>
       <div class="workout-layout">
       <div class="card pad log-card">
@@ -158,7 +158,7 @@
     <section id="page-settings" class="page">
       <div class="section"><div><h2>Settings</h2><p class="meta">Manage your training plan, data, and account.</p></div></div>
 
-      <div class="section settings-section"><h2>Training plan</h2><span class="tag" id="edit-profile-tag">48-hour rotation</span></div>
+      <div class="section settings-section"><h2>Training plan</h2><span class="tag" id="edit-profile-tag">Training plan</span></div>
       <div class="card pad">
         <div class="formgrid single-setting">
           <div class="field"><label for="edit-expected">Expected sessions per week</label><input id="edit-expected" type="number" min="0" max="14" step="0.5"></div>

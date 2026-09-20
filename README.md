@@ -2,7 +2,7 @@
 
 Installable workout PWA deployed on Cloudflare Workers, using Supabase Auth and Postgres persistence.
 
-The active programme is the six-day 48-hour rotation from `48-Hour-Rotation.pdf`. The dashboard highlights today's rotation day, current exercise, prescribed sets/reps/RIR, and set progress. The interface uses one workout profile; legacy rows under other profile keys are left untouched.
+The default programme is the six-day upper/lower schedule in `data/programs.js` (restored after the short-lived 48-hour rotation). The dashboard highlights today's day, current exercise, prescribed sets/reps, and set progress. The interface uses one workout profile; legacy rows under other profile keys are left untouched.
 
 ## Tracking
 
