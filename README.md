@@ -2,7 +2,7 @@
 
 Installable workout PWA deployed on Cloudflare Workers, using Supabase Auth and Postgres persistence.
 
-The default programme is the six-day upper/lower schedule in `data/programs.js` (restored after the short-lived 48-hour rotation). The dashboard highlights today's day, current exercise, prescribed sets/reps, and set progress. The interface uses one workout profile; legacy rows under other profile keys are left untouched.
+The default programme is the six-day upper/lower schedule in `data/programs.js`: low volume (at most two sets per exercise), every muscle trained several times a week, upper days of 7-8 exercises and short 3-4 exercise lower days. It has no hinge movement. Existing accounts keep their saved schedule until you tap **Reset plan** in the schedule editor. The dashboard highlights today's day, current exercise, prescribed sets/reps, and set progress. The interface uses one workout profile; legacy rows under other profile keys are left untouched.
 
 ## Tracking
 
@@ -21,7 +21,7 @@ The old `daily_checkins` table is deliberately left untouched so historical body
 Supported exact movements:
 
 - Barbell squat (`squat-variation`)
-- Stiff-leg deadlift
+- Stiff-leg deadlift (no longer in the default programme, kept for historical logs)
 - Incline bench press
 - Shoulder/overhead press
 
